@@ -1,0 +1,268 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Getopt::Long qw(:config no_ignore_case);
+use Pod::Usage;
+use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
+use Cwd 'abs_path';
+use feature 'say';
+use Data::Dumper;
+
+#use lib (dirname abs_path $0) . '/lib';
+
+my $CFGFILE;
+my %CFG = (
+	DEBUG      => 0,
+	VERBOSE    => 0,
+	UTC        => 0,
+	CREATEDIRS => 0,
+
+	# 	CR         => "\n",
+);
+my $SUIT = "";
+my %NOW;    # timekeeping
+my %opt;
+my ( $opt_help, $opt_man );
+
+GetOptions(
+	'help!'      => \$opt_help,
+	'man!'       => \$opt_man,
+	'config=s'   => \$CFGFILE,
+	'DEBUG'      => \$CFG{DEBUG},
+	'verbose'    => \$CFG{VERBOSE},
+	'dryrun'     => \$CFG{DRYRUN},
+	'UTC'        => \$CFG{UTC},
+	'createdirs' => \$CFG{CREATEDIRS},
+	'force'      => \$CFG{FORCE},
+	'suit:s'     => \$SUIT,
+) or pod2usage( -verbose => 0 );
+
+pod2usage( -verbose => 1 ) if defined $opt_help;
+pod2usage( -verbose => 2 ) if defined $opt_man;
+
+# Make sure at least one argument provided
+if ( !@ARGV ) {
+	pod2usage( -verbose => 0, -message => "$0: one argument required" );
+}
+
+# Read configuration file
+{
+	my $me      = abs_path( dirname($0) ) . '/' . basename($0);
+	my $BASEDIR = dirname $me;
+	%CFG = (
+		%CFG,
+		(
+			'BASEDIR' => $BASEDIR,
+			'SUITDIR' => $BASEDIR . "/suits",
+			'SERVERS' => 'servers',
+			'SCRIPTS' => 'scripts',
+			'RESULTS' => 'results',
+			'TEMP'    => $BASEDIR . "/tmp",
+			'SUIT'    => '..',
+		)
+	);
+	updateTime( \%CFG );
+	my ( $name, $path, $suffix ) = fileparse( $me, '.pl' );
+	my $CFGFILE = $path . $name . '.cfg';
+	-f $CFGFILE
+	  || -f ( $CFGFILE = $path . 'cfg/' . $name . '.cfg' )
+	  || -f ( $CFGFILE = $path . '../cfg/' . $name . '.cfg' );
+	if ( -f $CFGFILE ) {
+		$CFG{'CFGFILE'} = $CFGFILE;
+		open( my $CFG, '<', $CFGFILE ) or die "$CFGFILE $!\n";
+		my %DIRS = map { $_ => 1 } qw(TEMP);
+		while (<$CFG>) {
+			next if /^#/ || !/=/;
+			chomp;
+			s/\s+$//;
+			if (/^ALIAS\s+(\S+)=(.*)/) {
+				$CFG{'ALIAS'}{$1} = $2;
+			} else {
+				my ( $k, $v ) = split '=', $_, 2;
+				$v = xexpand( $v, '%\{(\w+)\}', \%CFG ) if index( $v, "%{" ) > -1;
+				$v = abs_path($v) if $DIRS{$k};
+				$CFG{$k} = $v;
+			}
+		}
+	}
+}
+
+say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
+say Dumper \%CFG if $CFG{'DEBUG'};
+
+pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR'}\n" )
+  unless -d $CFG{'SUITDIR'};
+
+my %SCRIPT_FILES;
+my @REG_SCRIPTS;
+my @REG_SERVERS;
+
+# Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
+for my $arg (@ARGV) {
+	say "Processing ARG: $arg" if $CFG{'VERBOSE'};
+	my ( $suit, $scripts ) =
+	  index( $arg, ':' ) > -1 ? split( ':', $arg, 2 ) : ( $SUIT || $CFG{'SUIT'}, $arg );
+
+	# make a proper scripts (add =* if not there)
+	$scripts .= '=' unless index( $scripts, '=' ) > -1;
+	$scripts =~ s/=$/=*/;
+	$scripts =~ s/^=/*=/;
+	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/ for keys %{ $CFG{'ALIAS'} };
+
+	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
+	my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
+	my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
+	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts)" if $CFG{'DEBUG'};
+	$scriptsdir = abs_path($scriptsdir)
+	  || pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $scriptsdir\n" );
+	$serversdir = abs_path($serversdir)
+	  || pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $serversdir\n" );
+
+	# If we are using +, make transform it to something glob can use to find servers
+	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
+	$reg_servers =~ s/\+$/-*/;
+	$reg_servers =~ s/^\+/*-/;
+	$reg_servers =~ s/\+\+/-*-/;
+
+	# Give me all scripts that match the scripts name, independant of servers
+	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
+	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n" unless @REG_SCRIPTS;
+
+	# Now, for the found scripts, check the servers part and match it against it's $reg_server
+	for my $script (@REG_SCRIPTS) {
+		@REG_SERVERS = ();
+		my ( $reg_script, $reg_server ) = split "=", $script, 2;
+		$reg_server =~ s/\+$/-*/;
+		$reg_server =~ s/^\+/*-/;
+		$reg_server =~ s/\+\+/-*-/;
+		say "For $script, search for servers: $reg_server in $serversdir arg:($arg)"
+		  if $CFG{'VERBOSE'};
+		push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
+		warn "Nothing found for $CFG{'SERVERS'}/$reg_server\n" unless @REG_SERVERS;
+
+		# And for that real server string representing a file, match our pattern $scripts
+		for my $server (@REG_SERVERS) {
+			my $scriptserver = $script;
+			$scriptserver =~ s/=\K.*/$server/;
+			my $scriptsreg = $scripts;
+			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
+			my $matches = $scriptserver =~ /$scriptsreg/;
+			say
+"check FIT arg: $arg script: $script scripts:$scripts\n scriptsreg: $scriptsreg scriptserver: $scriptserver\n"
+			  . " server=$server  $scriptserver =~/ $scriptsreg / matches=$matches"
+			  if $CFG{'DEBUG'};
+			++$SCRIPT_FILES{ $suit . ':' . $script }{ $suit . ':' . $server } if $matches;
+		}
+	}
+
+	for my $suitscript ( sort keys %SCRIPT_FILES ) {
+		my ( $suit, $script ) = split ":", $suitscript, 2;
+		my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
+		$CFG{RUNSCRIPTSDIR} = $scriptsdir = abs_path $scriptsdir;
+		my $resultsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'RESULTS'};
+		$CFG{RUNRESULTSDIR} = $resultsdir = abs_path $resultsdir;
+		for my $suitserver ( sort keys %{ $SCRIPT_FILES{$suitscript} } ) {
+			my ( $suit, $server ) = split ":", $suitserver, 2;
+			my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
+			$CFG{RUNSERVERSDIR} = $serversdir = abs_path $serversdir;
+			updateTime( \%CFG );
+			$CFG{RUNSUIT} = $suit;
+			$CFG{RUNNAME} = $CFG{RUNSCRIPT} = $script;
+			$CFG{RUNNAME} =~ s/=.*//;
+			$CFG{RUNSERVER}   = $server;
+			$CFG{RUNSCRIPTFQ} = $CFG{RUNSCRIPTSDIR} . '/' . $CFG{RUNSCRIPT};
+			$CFG{RUNSERVERFQ} = $CFG{RUNSERVERSDIR} . '/' . $CFG{RUNSERVER};
+			say "# RUN($arg) $suit $script on $server" if $CFG{'VERBOSE'};
+			say "#SCRIPT=$CFG{RUNSCRIPTFQ}"            if $CFG{'VERBOSE'};
+			say "#SERVER=$CFG{RUNSERVERFQ}"            if $CFG{'VERBOSE'};
+
+			for my $run (qw(RUN_PRE RUN RUN_POST)) {
+				if ( $_ = $CFG{$run} ) {
+					xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
+					if ( $CFG{DRYRUN} ) {
+						say $_;
+					} else {
+						say $_ if $CFG{'VERBOSE'};
+						system $_;
+					}
+
+				}
+			}
+		}
+	}
+}
+
+# xexpands %{} variables
+sub xexpand
+{
+	$_[0] =~ s/$_[1]/$_[2]{$1}?$_[2]{$1}:"%{$1}"/ge;
+	$_[0];
+}
+
+# Time variables used in AUTOMAINTENANCE expressions
+sub updateTime
+{
+	my ( $v, $e ) = @_;
+	$v->{"EPOCH"} = $e = ( $e || time );
+	my @T = $CFG{UTC} ? gmtime($e) : localtime($e);    # S M H d m+1 y+1900 wd yd daylightsaving
+	$v->{"HH"} = $T[2] < 10 ? '0' . $T[2] : $T[2];     # hour (00..23)
+	$v->{"MM"} = $T[1] < 10 ? '0' . $T[1] : $T[1];     # minute (00..59)
+	$v->{"SS"} = $T[0] < 10 ? '0' . $T[0] : $T[0];     # seconds (00..23)
+	$v->{"HHMM"} = $v->{"HH"} . $v->{"MM"};
+	$v->{"WD"}   = $T[6] || 7;                         # 1=Monday ... 6=Saturday, 7=Sunday
+	$v->{"YD"}   = sprintf( "%03d", $T[7] + 1 )
+	  ;    # day of the year, in the range 001..365 (or 001..366 if leap year)
+	$v->{"DAY"}   = $T[3] < 10   ? '0' . $T[3] : $T[3];    # day of the month
+	$v->{"MONTH"} = ++$T[4] < 10 ? '0' . $T[4] : $T[4];    # 01=jan ... 12=dec
+	$v->{"YEAR"} = $T[5] + 1900;                           # 4 digits year
+	$v->{"DS"}   = $T[8];                                  # daylightsaving
+
+	$v->{"TOTALTIME"} = time - $^T;                        # total seconds running
+}
+
+__END__
+
+=head1 NAME
+
+evidencer.pl - A program to join servers and scripts
+
+=head1 SYNOPSIS
+
+ evidencer [-s <suit>] [suit:]<script>[=servergroup,...|@hostnames,...] [--help]
+
+=head1 DESCRIPTION
+
+./servers/  Define a list of server by function.
+
+./scripts/  Define a list of tests, by function, to be run on those servers
+
+./results/  Just an empty directory to store results in (from an external program)
+
+./suits/    Once you are done with your tests, move them away into a suit, still available
+
+=head1 OPTIONS
+
+ [OPT         DESCRIPTION]
+
+ --help       Print Options and Arguments.
+ --man        Print complete man page.
+ --verbose    Log more to the screen
+ --DEBUG      Log a bit more to the screen
+ --dryrun     Do not execute, but show all that would have been run
+ --UTC        timestrings are in UTC instead of localtime
+ --createdirs Create directories if they do not exist
+ --force      Force running a test on a server it is not supposed to
+ --config $configuration_file
+ --suit <suit>
+
+ Example:
+ ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver001
+
+
+=head1 LICENSE
+
+This software is released under the Unlicense statement.
+It is free and unencumbered software released into the public domain.
+If you don't know what that means visit L<https://unlicense.org/>.
+
+=cut
