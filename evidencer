@@ -17,10 +17,10 @@ my %CFG = (
 	UTC        => 0,
 	CREATEDIRS => 0,
 
-	# 	CR         => "\n",
+	NEWLINE         => "\n",
 );
 my $SUIT = "";
-my %NOW;    # timekeeping
+#my %NOW;    # timekeeping
 my %opt;
 my ( $opt_help, $opt_man );
 
@@ -32,7 +32,7 @@ GetOptions(
 	'verbose'    => \$CFG{VERBOSE},
 	'dryrun'     => \$CFG{DRYRUN},
 	'UTC'        => \$CFG{UTC},
-	'createdirs' => \$CFG{CREATEDIRS},
+	'CREATEDIRS' => \$CFG{CREATEDIRS},
 	'force'      => \$CFG{FORCE},
 	'suit:s'     => \$SUIT,
 ) or pod2usage( -verbose => 0 );
@@ -41,7 +41,7 @@ pod2usage( -verbose => 1 ) if defined $opt_help;
 pod2usage( -verbose => 2 ) if defined $opt_man;
 
 # Make sure at least one argument provided
-if ( !@ARGV ) {
+if ( !@ARGV && !$CFG{'CREATEDIRS'}) {
 	pod2usage( -verbose => 0, -message => "$0: one argument required" );
 }
 
@@ -53,12 +53,12 @@ if ( !@ARGV ) {
 		%CFG,
 		(
 			'BASEDIR' => $BASEDIR,
+			'TEMP'    => $BASEDIR . "/tmp",
 			'SUITDIR' => $BASEDIR . "/suits",
+			'SUIT'    => '..',
 			'SERVERS' => 'servers',
 			'SCRIPTS' => 'scripts',
 			'RESULTS' => 'results',
-			'TEMP'    => $BASEDIR . "/tmp",
-			'SUIT'    => '..',
 		)
 	);
 	updateTime( \%CFG );
@@ -90,6 +90,28 @@ if ( !@ARGV ) {
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 say Dumper \%CFG if $CFG{'DEBUG'};
 
+sub md{
+  if(! -d $_[0]){
+    say "mkdir $_[0]";
+    mkdir $_[0];
+    return 1
+  }elsif($CFG{'VERBOSE'}||$CFG{'DEBUG'}){
+    say "#Directory already exists: $_[0]";
+    return 0
+  }
+}
+
+if($CFG{'CREATEDIRS'}){
+  $SUIT = $SUIT || $CFG{'SUIT'};
+  my $c=0;
+  $c+=md($CFG{$_}) for (qw(TEMP SUITDIR));
+  $c+=md($CFG{'SUITDIR'}.'/'.$SUIT);
+  $c+=md($CFG{'SUITDIR'}.'/'.$SUIT.'/'.$CFG{$_}) for (qw(SERVERS SCRIPTS RESULTS));
+  say "$c directories created";
+  exit 0;
+}
+
+
 pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR'}\n" )
   unless -d $CFG{'SUITDIR'};
 
@@ -118,7 +140,7 @@ for my $arg (@ARGV) {
 	$serversdir = abs_path($serversdir)
 	  || pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $serversdir\n" );
 
-	# If we are using +, make transform it to something glob can use to find servers
+	# If we are using +, transform it to something glob can use to find servers
 	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
 	$reg_servers =~ s/\+$/-*/;
 	$reg_servers =~ s/^\+/*-/;
@@ -175,6 +197,11 @@ for my $arg (@ARGV) {
 			say "# RUN($arg) $suit $script on $server" if $CFG{'VERBOSE'};
 			say "#SCRIPT=$CFG{RUNSCRIPTFQ}"            if $CFG{'VERBOSE'};
 			say "#SERVER=$CFG{RUNSERVERFQ}"            if $CFG{'VERBOSE'};
+			if( $CFG{'DEBUG'} ){
+			  for my $key (sort keys %CFG){
+			    say "DEBUG: \%{$key}=$CFG{$key}"
+			  }
+			}
 
 			for my $run (qw(RUN_PRE RUN RUN_POST)) {
 				if ( $_ = $CFG{$run} ) {
@@ -228,7 +255,7 @@ evidencer.pl - A program to join servers and scripts
 
 =head1 SYNOPSIS
 
- evidencer [-s <suit>] [suit:]<script>[=servergroup,...|@hostnames,...] [--help]
+ evidencer [-s <suit>] [suit:]<script>[=servergroup,...][@hostnames,...] [--help]
 
 =head1 DESCRIPTION
 
@@ -239,6 +266,9 @@ evidencer.pl - A program to join servers and scripts
 ./results/  Just an empty directory to store results in (from an external program)
 
 ./suits/    Once you are done with your tests, move them away into a suit, still available
+
+To create a suits directory structure:
+./evidencer -C -s MYAPPL
 
 =head1 OPTIONS
 
