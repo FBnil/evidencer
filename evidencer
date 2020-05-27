@@ -12,16 +12,11 @@ use Data::Dumper;
 
 my $CFGFILE;
 my %CFG = (
-	DEBUG      => 0,
-	VERBOSE    => 0,
-	UTC        => 0,
-	CREATEDIRS => 0,
-
+	UTC     => 0,
 	NEWLINE => "\n",
 );
 my $SUIT = "";
-
-#my %NOW;    # timekeeping
+my %NOW;    # timekeeping
 my %opt;
 my ( $opt_help, $opt_man );
 
@@ -37,6 +32,9 @@ GetOptions(
 	'force'      => \$CFG{FORCE},
 	'suit:s'     => \$SUIT,
 ) or pod2usage( -verbose => 0 );
+
+# Do not override these from configuration file if set from the commandline through params
+my %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
 
 pod2usage( -verbose => 1 ) if defined $opt_help;
 pod2usage( -verbose => 2 ) if defined $opt_man;
@@ -62,7 +60,7 @@ if ( !@ARGV && !$CFG{'CREATEDIRS'} ) {
 			'RESULTS' => 'results',
 		)
 	);
-	updateTime( \%CFG );
+	updateTime( \%CFG );    # cfgfile might need the variables.
 	my ( $name, $path, $suffix ) = fileparse( $me, '.pl' );
 	my $CFGFILE = $path . $name . '.cfg';
 	-f $CFGFILE
@@ -82,7 +80,7 @@ if ( !@ARGV && !$CFG{'CREATEDIRS'} ) {
 				my ( $k, $v ) = split '=', $_, 2;
 				$v = xexpand( $v, '%\{(\w+)\}', \%CFG ) if index( $v, "%{" ) > -1;
 				$v = abs_path($v) if $DIRS{$k};
-				$CFG{$k} = $v;
+				$CFG{$k} = $v unless $DONOTOVERRIDE{$k} && defined $CFG{$k};
 			}
 		}
 	}
@@ -143,10 +141,7 @@ for my $arg (@ARGV) {
 
 	# If we are using +, transform it to something glob can use to find servers
 	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
-	$reg_servers =~ s/^(\+\+)|(\+\+)$/$1?"*-":"-*"/ge;
-	while ( $reg_servers =~ s/\+\+|\-\-/-*-/g ) { }
-	$reg_servers =~ s/\+/\*/g;
-	$reg_servers =~ s/^(\-)|(\-)$/$2\*$1/g;
+	globlize($reg_servers);
 
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
@@ -156,9 +151,8 @@ for my $arg (@ARGV) {
 	for my $script (@REG_SCRIPTS) {
 		@REG_SERVERS = ();
 		my ( $reg_script, $reg_server ) = split "=", $script, 2;
-		$reg_server =~ s/\+$/-*/;
-		$reg_server =~ s/^\+/*-/;
-		$reg_server =~ s/\+\+/-*-/;
+		next unless $reg_server;    # skip files that do not have servergroup candidates
+		globlize($reg_server);
 		say "For $script, search for servers: $reg_server in $serversdir arg:($arg)"
 		  if $CFG{'VERBOSE'};
 		push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
@@ -169,6 +163,7 @@ for my $arg (@ARGV) {
 			my $scriptserver = $script;
 			$scriptserver =~ s/=\K.*/$server/;
 			my $scriptsreg = $scripts;
+			globlize($scriptsreg);
 			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
 			my $matches = $scriptserver =~ /$scriptsreg/;
 			say
@@ -220,6 +215,15 @@ for my $arg (@ARGV) {
 			}
 		}
 	}
+}
+
+# transform lazy search into a glob-able pattern
+sub globlize
+{
+	$_[0] =~ s/^(\+\+)|(=\K\+\+)|(\+\+)$/$1||$2?"*-":"-*"/ge;
+	while ( $_[0] =~ s/\+\+|\-\-/-*-/g ) { }
+	$_[0] =~ s/\+/\*/g;
+	$_[0] =~ s/^(\-)|(\-)$/$2\*$1/g;
 }
 
 # xexpands %{} variables
