@@ -17,9 +17,10 @@ my %CFG = (
 	UTC        => 0,
 	CREATEDIRS => 0,
 
-	NEWLINE         => "\n",
+	NEWLINE => "\n",
 );
 my $SUIT = "";
+
 #my %NOW;    # timekeeping
 my %opt;
 my ( $opt_help, $opt_man );
@@ -41,7 +42,7 @@ pod2usage( -verbose => 1 ) if defined $opt_help;
 pod2usage( -verbose => 2 ) if defined $opt_man;
 
 # Make sure at least one argument provided
-if ( !@ARGV && !$CFG{'CREATEDIRS'}) {
+if ( !@ARGV && !$CFG{'CREATEDIRS'} ) {
 	pod2usage( -verbose => 0, -message => "$0: one argument required" );
 }
 
@@ -90,27 +91,27 @@ if ( !@ARGV && !$CFG{'CREATEDIRS'}) {
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 say Dumper \%CFG if $CFG{'DEBUG'};
 
-sub md{
-  if(! -d $_[0]){
-    say "mkdir $_[0]";
-    mkdir $_[0];
-    return 1
-  }elsif($CFG{'VERBOSE'}||$CFG{'DEBUG'}){
-    say "#Directory already exists: $_[0]";
-    return 0
-  }
+sub md
+{
+	if ( !-d $_[0] ) {
+		say "mkdir $_[0]";
+		mkdir $_[0];
+		return 1;
+	} elsif ( $CFG{'VERBOSE'} || $CFG{'DEBUG'} ) {
+		say "#Directory already exists: $_[0]";
+		return 0;
+	}
 }
 
-if($CFG{'CREATEDIRS'}){
-  $SUIT = $SUIT || $CFG{'SUIT'};
-  my $c=0;
-  $c+=md($CFG{$_}) for (qw(TEMP SUITDIR));
-  $c+=md($CFG{'SUITDIR'}.'/'.$SUIT);
-  $c+=md($CFG{'SUITDIR'}.'/'.$SUIT.'/'.$CFG{$_}) for (qw(SERVERS SCRIPTS RESULTS));
-  say "$c directories created";
-  exit 0;
+if ( $CFG{'CREATEDIRS'} ) {
+	$SUIT = $SUIT || $CFG{'SUIT'};
+	my $c = 0;
+	$c += md( $CFG{$_} )                                       for (qw(TEMP SUITDIR));
+	$c += md( $CFG{'SUITDIR'} . '/' . $SUIT );
+	$c += md( $CFG{'SUITDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
+	say "$c directories created";
+	exit 0;
 }
-
 
 pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR'}\n" )
   unless -d $CFG{'SUITDIR'};
@@ -142,9 +143,10 @@ for my $arg (@ARGV) {
 
 	# If we are using +, transform it to something glob can use to find servers
 	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
-	$reg_servers =~ s/\+$/-*/;
-	$reg_servers =~ s/^\+/*-/;
-	$reg_servers =~ s/\+\+/-*-/;
+	$reg_servers =~ s/^(\+\+)|(\+\+)$/$1?"*-":"-*"/ge;
+	while ( $reg_servers =~ s/\+\+|\-\-/-*-/g ) { }
+	$reg_servers =~ s/\+/\*/g;
+	$reg_servers =~ s/^(\-)|(\-)$/$2\*$1/g;
 
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
@@ -197,10 +199,11 @@ for my $arg (@ARGV) {
 			say "# RUN($arg) $suit $script on $server" if $CFG{'VERBOSE'};
 			say "#SCRIPT=$CFG{RUNSCRIPTFQ}"            if $CFG{'VERBOSE'};
 			say "#SERVER=$CFG{RUNSERVERFQ}"            if $CFG{'VERBOSE'};
-			if( $CFG{'DEBUG'} ){
-			  for my $key (sort keys %CFG){
-			    say "DEBUG: \%{$key}=$CFG{$key}"
-			  }
+
+			if ( $CFG{'DEBUG'} ) {
+				for my $key ( sort keys %CFG ) {
+					say "DEBUG: \%{$key}=$CFG{$key}";
+				}
 			}
 
 			for my $run (qw(RUN_PRE RUN RUN_POST)) {
