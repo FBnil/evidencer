@@ -6,17 +6,18 @@ use Pod::Usage;
 use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd 'abs_path';
 use feature 'say';
-use Data::Dumper;
+use Data::Dumper;    # @TODO remove when out of development
 
 #use lib (dirname abs_path $0) . '/lib';
 
 my $CFGFILE;
 my %CFG = (
+	PID     => $$,
 	UTC     => 0,
 	NEWLINE => "\n",
 );
 my $SUIT = "";
-my %NOW;    # timekeeping
+
 my %opt;
 my ( $opt_help, $opt_man );
 
@@ -29,7 +30,7 @@ GetOptions(
 	'dryrun'     => \$CFG{DRYRUN},
 	'UTC'        => \$CFG{UTC},
 	'CREATEDIRS' => \$CFG{CREATEDIRS},
-	'force'      => \$CFG{FORCE},
+	'keep'       => \$CFG{KEEP},
 	'suit:s'     => \$SUIT,
 ) or pod2usage( -verbose => 0 );
 
@@ -68,7 +69,7 @@ if ( !@ARGV && !$CFG{'CREATEDIRS'} ) {
 	  || -f ( $CFGFILE = $path . '../cfg/' . $name . '.cfg' );
 	if ( -f $CFGFILE ) {
 		$CFG{'CFGFILE'} = $CFGFILE;
-		open( my $CFG, '<', $CFGFILE ) or die "$CFGFILE $!\n";
+		open( my $CFG, '<', $CFGFILE ) or abort("$CFGFILE $!");
 		my %DIRS = map { $_ => 1 } qw(TEMP);
 		while (<$CFG>) {
 			next if /^#/ || !/=/;
@@ -123,17 +124,21 @@ for my $arg (@ARGV) {
 	say "Processing ARG: $arg" if $CFG{'VERBOSE'};
 	my ( $suit, $scripts ) =
 	  index( $arg, ':' ) > -1 ? split( ':', $arg, 2 ) : ( $SUIT || $CFG{'SUIT'}, $arg );
+	my $hoststr;
+	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $arg, '@' ) > -1;
 
 	# make a proper scripts (add =* if not there)
 	$scripts .= '=' unless index( $scripts, '=' ) > -1;
 	$scripts =~ s/=$/=*/;
 	$scripts =~ s/^=/*=/;
-	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/ for keys %{ $CFG{'ALIAS'} };
+	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+	$suit    =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
 	my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
 	my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
-	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts)" if $CFG{'DEBUG'};
+	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts) hoststr=($hoststr)"
+	  if $CFG{'DEBUG'};
 	$scriptsdir = abs_path($scriptsdir)
 	  || pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $scriptsdir\n" );
 	$serversdir = abs_path($serversdir)
@@ -171,6 +176,12 @@ for my $arg (@ARGV) {
 			  . " server=$server  $scriptserver =~/ $scriptsreg / matches=$matches"
 			  if $CFG{'DEBUG'};
 			++$SCRIPT_FILES{ $suit . ':' . $script }{ $suit . ':' . $server } if $matches;
+
+			if ($hoststr) {
+
+				# TODO: give it a pointer to where $hoststr has regexp (split /,/)
+				@{ $SCRIPT_FILES{ $suit . ':' . $script }{'!'} } = split /,/, $hoststr;
+			}
 		}
 	}
 
@@ -180,17 +191,53 @@ for my $arg (@ARGV) {
 		$CFG{RUNSCRIPTSDIR} = $scriptsdir = abs_path $scriptsdir;
 		my $resultsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'RESULTS'};
 		$CFG{RUNRESULTSDIR} = $resultsdir = abs_path $resultsdir;
-		for my $suitserver ( sort keys %{ $SCRIPT_FILES{$suitscript} } ) {
+		for my $suitserver ( grep { !/^!$/ } sort keys %{ $SCRIPT_FILES{$suitscript} } ) {
 			my ( $suit, $server ) = split ":", $suitserver, 2;
 			my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
-			$CFG{RUNSERVERSDIR} = $serversdir = abs_path $serversdir;
-			updateTime( \%CFG );
-			$CFG{RUNSUIT} = $suit;
-			$CFG{RUNNAME} = $CFG{RUNSCRIPT} = $script;
+			$CFG{RUNSERVERSDIR} = $serversdir     = abs_path $serversdir;
+			$CFG{RUNSUIT}       = $suit;
+			$CFG{RUNNAME}       = $CFG{RUNSCRIPT} = $script;
 			$CFG{RUNNAME} =~ s/=.*//;
 			$CFG{RUNSERVER}   = $server;
 			$CFG{RUNSCRIPTFQ} = $CFG{RUNSCRIPTSDIR} . '/' . $CFG{RUNSCRIPT};
 			$CFG{RUNSERVERFQ} = $CFG{RUNSERVERSDIR} . '/' . $CFG{RUNSERVER};
+
+			if ( defined $SCRIPT_FILES{$suitscript}{'!'} ) {
+				say "###$script:opening $CFG{RUNSERVERFQ} for $CFG{RUNSCRIPTFQ}" if $CFG{'DEBUG'};
+				open( FIN, '<', $CFG{RUNSERVERFQ} ) or abort("$CFG{RUNSERVERFQ}: $!");
+				my @servers;
+				my $counter = 0;
+				while (<FIN>) {
+					chomp;
+					my $found = 0;
+					++$counter;
+					for my $regexp ( @{ $SCRIPT_FILES{$suitscript}{'!'} } ) {
+						say "looking if $_ matches $regexp" if $CFG{'DEBUG'};
+						if (m/$regexp/ix) {
+							push @servers, $_;
+							last;
+						}
+					}
+				}
+				close(FIN);
+				say "Filter(\@) matched "
+				  . ( $#servers + 1 )
+				  . " out of $counter from $CFG{RUNSERVERFQ}"
+				  if $CFG{'DEBUG'};
+				next unless @servers;    # no matches, skip this test
+					 # only create a temporal file if we do not match ALL servers in this group.
+				if ( $#servers + 1 < $counter ) {
+					my $tempfile =
+					  ( $suit eq ".." ? '_' : $suit ) . '#' . $script . '#' . $CFG{PID};
+					push @{ $CFG{_CLEANUP} }, ( $CFG{RUNSERVERFQ} = $CFG{TEMP} . '/' . $tempfile );
+					$CFG{RUNSERVERSDIR} = $CFG{TEMP};
+					$CFG{RUNSERVER}     = $server = $tempfile;
+					open( FOUT, '>', $CFG{RUNSERVERFQ} ) or abort("$CFG{RUNSERVERFQ}: $!");
+					say FOUT $_ for @servers;
+					close FOUT;
+				}
+			}
+
 			say "# RUN($arg) $suit $script on $server" if $CFG{'VERBOSE'};
 			say "#SCRIPT=$CFG{RUNSCRIPTFQ}"            if $CFG{'VERBOSE'};
 			say "#SERVER=$CFG{RUNSERVERFQ}"            if $CFG{'VERBOSE'};
@@ -202,17 +249,44 @@ for my $arg (@ARGV) {
 			}
 
 			for my $run (qw(RUN_PRE RUN RUN_POST)) {
-				if ( $_ = $CFG{$run} ) {
-					xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
-					if ( $CFG{DRYRUN} ) {
-						say $_;
-					} else {
-						say $_ if $CFG{'VERBOSE'};
-						system $_;
-					}
-
-				}
+				runit($run);
 			}
+		}
+	}
+}
+if ( !$CFG{'KEEP'} ) {
+	for my $tmpfile ( @{ $CFG{_CLEANUP} } ) {
+		say "removing temporal file $tmpfile" if $CFG{'VERBOSE'};
+		unlink $tmpfile;
+	}
+}
+
+runit('RUNFINISH');
+
+# allow executing ABORTMSG before die (usually from lacking permissions to read/write files)
+sub abort
+{
+	$CFG{'ABORTMSG'} = $_[0];
+	runit('RUNABORT');
+	die $_[0] . "\n";
+}
+
+# Run (or dryrun) the commands defined as RUN... in the cfg file
+sub runit
+{
+	if ( $_ = $CFG{ $_[0] } ) {
+		updateTime( \%CFG );
+		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
+		if ( $CFG{DRYRUN} ) {
+			say $CFG{RUNSTART} if ( defined $CFG{RUNSTART} && !$CFG{RUNSTARTED}++ );
+			say $_;
+		} else {
+			if ( defined $CFG{RUNSTART} && !$CFG{RUNSTARTED}++ ) {
+				say $CFG{RUNSTART} if $CFG{'VERBOSE'};
+				system $CFG{RUNSTART};
+			}
+			say $_ if $CFG{'VERBOSE'};
+			system $_;
 		}
 	}
 }
@@ -262,7 +336,7 @@ evidencer.pl - A program to join servers and scripts
 
 =head1 SYNOPSIS
 
- evidencer [-s <suit>] [suit:]<script>[=servergroup,...][@hostnames,...] [--help]
+ evidencer [-s <suit>] [suit:]<script>[=servergroup,...][@<hostnames,...>] [--help]
 
 =head1 DESCRIPTION
 
@@ -288,14 +362,36 @@ To create a suits directory structure:
  --dryrun     Do not execute, but show all that would have been run
  --UTC        timestrings are in UTC instead of localtime
  --createdirs Create directories if they do not exist
- --force      Force running a test on a server it is not supposed to
  --config $configuration_file
+ --keep       Do not cleanup temporal files created to accomodate the @server list
  --suit <suit>
 
  Example:
- ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver001
+ 
+ # Run, from the suit JAVATRANSACTIONS the test JAVASERVER-SERVICES= for servers JAVA-ET
+ # that match the perl regexp javaserver00[1..5] or the substring javaserver0100
+ ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
+ 
+ # show (dryrun) what would run from the suit JAVATRANSACTIONS the test 
+ # JAVASERVER-SERVICES= for any matching servers AND the test JAVASERVER-PORTS for any of it's
+ # matching servers
+ ./evidencer -s JAVATRANSACTIONS JAVASERVER-SERVICES=* JAVASERVER-PORTS -d
 
+ JAVASERVER-SERVICES=* can be written as:
+   JAVASERVER-SERVICES=  or as  JAVASERVER-SERVICES=+  or even as  JAVASERVER-SERVICES
+ 
+ The servergroup, can use a plus sign instead of an asterix, and these are the rules:
+ +     ==>  *       ++    ==>  *-*     +-+-+ ==>  *-*-*
+ +A    ==>  *A      A+    ==>  A*      ++B   ==>  *-B
+ +-A   ==>  *-A     A-+   ==>  A-*     A++   ==>  A-*
+ A++B  ==>  A-*-B   A-+B  ==>  A-*B    A+-B  ==>  A*-B
 
+ So if you have a servergroup call APACHE-PROD-DMZ, then =++DMZ would match that group.
+ And ++PROD++  would match *-PROD-*. These are glob expansions, which means it would match
+ exactly what ls would match if you do:  ls ./servers/*-PROD-*
+ 
+ If unsure, escape or quote your servergroup and use dryrun.
+ 
 =head1 LICENSE
 
 This software is released under the Unlicense statement.
