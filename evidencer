@@ -249,7 +249,7 @@ for my $arg (@ARGV) {
 			}
 
 			for my $run (qw(RUN_PRE RUN RUN_POST)) {
-				runit($run);
+				runit( $run, !$run =~ /PRE/ );    # update time only for RUN_PRE
 			}
 		}
 	}
@@ -275,7 +275,7 @@ sub abort
 sub runit
 {
 	if ( $_ = $CFG{ $_[0] } ) {
-		updateTime( \%CFG );
+		updateTime( \%CFG ) unless $_[1];
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
 		if ( $CFG{DRYRUN} ) {
 			say $CFG{RUNSTART} if ( defined $CFG{RUNSTART} && !$CFG{RUNSTARTED}++ );
@@ -391,6 +391,8 @@ To create a suits directory structure:
  exactly what ls would match if you do:  ls ./servers/*-PROD-*
  
  If unsure, escape or quote your servergroup and use dryrun.
+ 
+ @hostnames regexp's are not un-ALIAS-ed.
  
 =head1 LICENSE
 
