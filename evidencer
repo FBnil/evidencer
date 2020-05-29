@@ -6,7 +6,6 @@ use Pod::Usage;
 use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd 'abs_path';
 use feature 'say';
-use Data::Dumper;    # @TODO remove when out of development
 
 #use lib (dirname abs_path $0) . '/lib';
 
@@ -88,7 +87,6 @@ if ( !@ARGV && !$CFG{'CREATEDIRS'} ) {
 }
 
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
-say Dumper \%CFG if $CFG{'DEBUG'};
 
 sub md
 {
@@ -204,6 +202,7 @@ for my $arg (@ARGV) {
 
 			if ( defined $SCRIPT_FILES{$suitscript}{'!'} ) {
 				say "###$script:opening $CFG{RUNSERVERFQ} for $CFG{RUNSCRIPTFQ}" if $CFG{'DEBUG'};
+
 				open( FIN, '<', $CFG{RUNSERVERFQ} ) or abort("$CFG{RUNSERVERFQ}: $!");
 				my @servers;
 				my $counter = 0;
@@ -261,13 +260,13 @@ if ( !$CFG{'KEEP'} ) {
 	}
 }
 
-runit('RUNFINISH');
+runit('RUN_FINISH');
 
 # allow executing ABORTMSG before die (usually from lacking permissions to read/write files)
 sub abort
 {
 	$CFG{'ABORTMSG'} = $_[0];
-	runit('RUNABORT');
+	runit('RUN_ABORT');
 	die $_[0] . "\n";
 }
 
@@ -276,14 +275,15 @@ sub runit
 {
 	if ( $_ = $CFG{ $_[0] } ) {
 		updateTime( \%CFG ) unless $_[1];
+		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
 		if ( $CFG{DRYRUN} ) {
-			say $CFG{RUNSTART} if ( defined $CFG{RUNSTART} && !$CFG{RUNSTARTED}++ );
+			say $CFG{RUN_START} if ( defined $CFG{RUN_START} && !$CFG{RUN_STARTED}++ );
 			say $_;
 		} else {
-			if ( defined $CFG{RUNSTART} && !$CFG{RUNSTARTED}++ ) {
-				say $CFG{RUNSTART} if $CFG{'VERBOSE'};
-				system $CFG{RUNSTART};
+			if ( defined $CFG{RUN_START} && !$CFG{RUN_STARTED}++ ) {
+				say $CFG{RUN_START} if $CFG{'VERBOSE'};
+				system $CFG{RUN_START};
 			}
 			say $_ if $CFG{'VERBOSE'};
 			system $_;
@@ -316,9 +316,8 @@ sub updateTime
 	$v->{"HH"} = $T[2] < 10 ? '0' . $T[2] : $T[2];     # hour (00..23)
 	$v->{"MM"} = $T[1] < 10 ? '0' . $T[1] : $T[1];     # minute (00..59)
 	$v->{"SS"} = $T[0] < 10 ? '0' . $T[0] : $T[0];     # seconds (00..23)
-	$v->{"HHMM"} = $v->{"HH"} . $v->{"MM"};
-	$v->{"WD"}   = $T[6] || 7;                         # 1=Monday ... 6=Saturday, 7=Sunday
-	$v->{"YD"}   = sprintf( "%03d", $T[7] + 1 )
+	$v->{"WD"} = $T[6] || 7;                           # 1=Monday ... 6=Saturday, 7=Sunday
+	$v->{"YD"} = sprintf( "%03d", $T[7] + 1 )
 	  ;    # day of the year, in the range 001..365 (or 001..366 if leap year)
 	$v->{"DAY"}   = $T[3] < 10   ? '0' . $T[3] : $T[3];    # day of the month
 	$v->{"MONTH"} = ++$T[4] < 10 ? '0' . $T[4] : $T[4];    # 01=jan ... 12=dec
@@ -336,7 +335,7 @@ evidencer.pl - A program to join servers and scripts
 
 =head1 SYNOPSIS
 
- evidencer [-s <suit>] [suit:]<script>[=servergroup,...][@<hostnames,...>] [--help]
+ evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...>] [--help]
 
 =head1 DESCRIPTION
 
@@ -362,8 +361,8 @@ To create a suits directory structure:
  --dryrun     Do not execute, but show all that would have been run
  --UTC        timestrings are in UTC instead of localtime
  --createdirs Create directories if they do not exist
- --config $configuration_file
- --keep       Do not cleanup temporal files created to accomodate the @server list
+ --config $configuration_file   Read alternative cfg file
+ --keep       Do not cleanup temporal files created to accomodate the @hostnames list
  --suit <suit>
 
  Example:
@@ -386,9 +385,9 @@ To create a suits directory structure:
  +-A   ==>  *-A     A-+   ==>  A-*     A++   ==>  A-*
  A++B  ==>  A-*-B   A-+B  ==>  A-*B    A+-B  ==>  A*-B
 
- So if you have a servergroup call APACHE-PROD-DMZ, then =++DMZ would match that group.
+ So if you have a servergroup called APACHE-PROD-DMZ, then =++DMZ would match that group.
  And ++PROD++  would match *-PROD-*. These are glob expansions, which means it would match
- exactly what ls would match if you do:  ls ./servers/*-PROD-*
+ exactly what ls would match if you run:  ls ./servers/*-PROD-*
  
  If unsure, escape or quote your servergroup and use dryrun.
  
