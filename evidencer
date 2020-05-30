@@ -31,6 +31,7 @@ GetOptions(
 	'UTC'        => \$BASECFG{UTC},
 	'CREATEDIRS' => \$BASECFG{CREATEDIRS},
 	'keep'       => \$BASECFG{KEEP},
+	'noautofix'  => \$BASECFG{NOAUTOFIX},
 	'suit:s'     => \$SUIT,
 ) or pod2usage( -verbose => 0 );
 
@@ -203,6 +204,42 @@ for my $arg (@ARGV) {
 		}
 	}
 
+# Now loop over all scripts and make sure they do not overlap tests. For example, say:
+# You have test1=VM+ and test1=VM-ET, so the servergroup VM-ET matches both, clearly it is better to run test1=VM-ET
+	if ( !$CFG{'NOAUTOFIX'} ) {
+		my %TEST2SCRIPT;
+		for my $suitscript ( sort keys %SCRIPT_FILES ) {
+			my ( $test, $server ) = split "=", $suitscript, 2;
+			push @{ $TEST2SCRIPT{$test} }, $suitscript;
+		}
+		for my $test ( sort keys %TEST2SCRIPT ) {
+			my %SEEN;
+			for my $suitscript ( sort { length($b) <=> length($a) || $a cmp $b }
+				( @{ $TEST2SCRIPT{$test} } ) ) {
+				for my $servergroup ( keys %{ $SCRIPT_FILES{$suitscript} } ) {
+					if ( $SEEN{ $test . '=' . $servergroup }++ ) {
+						$SCRIPT_FILES{$suitscript}{$servergroup} = 0;
+					}
+
+				}
+			}
+		}
+	}
+	if ( $CFG{'DEBUG'} ) {
+		no warnings;
+		say "DEBUG: Variables list";
+		updateTime( \%CFG );
+		for my $key ( sort keys %CFG ) {
+			say " \%{$key}=$CFG{$key}";
+		}
+
+		for my $key1 ( sort keys %SCRIPT_FILES ) {
+			for my $key2 ( sort keys %{ $SCRIPT_FILES{$key1} } ) {
+				say "DEBUG: WOULD RUN $SCRIPT_FILES{$key1}{$key2} == $key1 => $key2";
+			}
+		}
+	}
+
 	for my $suitscript ( sort keys %SCRIPT_FILES ) {
 		my ( $suit, $script ) = split ":", $suitscript, 2;
 		my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
@@ -210,6 +247,10 @@ for my $arg (@ARGV) {
 		my $resultsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'RESULTS'};
 		$CFG{RUNRESULTSDIR} = $resultsdir = abs_path $resultsdir;
 		for my $suitserver ( grep { !/^!$/ } sort keys %{ $SCRIPT_FILES{$suitscript} } ) {
+			if ( $SCRIPT_FILES{$suitscript}{$suitserver} == 0 ) {
+				say "SKIPPING $suitscript $suitserver" if $CFG{'DEBUG'};
+				next;
+			}
 			my ( $suit, $server ) = split ":", $suitserver, 2;
 			my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
 			$CFG{RUNSERVERSDIR} = $serversdir     = abs_path $serversdir;
@@ -257,15 +298,9 @@ for my $arg (@ARGV) {
 				}
 			}
 
-			say "# RUN($arg) $suit $script on $server" if $CFG{'VERBOSE'};
-			say "#SCRIPT=$CFG{RUNSCRIPTFQ}"            if $CFG{'VERBOSE'};
-			say "#SERVER=$CFG{RUNSERVERFQ}"            if $CFG{'VERBOSE'};
-
-			if ( $CFG{'DEBUG'} ) {
-				for my $key ( sort keys %CFG ) {
-					say "DEBUG: \%{$key}=$CFG{$key}";
-				}
-			}
+			say "# RUN($arg) $suit:$script on $server" if $CFG{'VERBOSE'};
+			say "# SCRIPT=$CFG{RUNSCRIPTFQ}"           if $CFG{'VERBOSE'};
+			say "# SERVER=$CFG{RUNSERVERFQ}"           if $CFG{'VERBOSE'};
 
 			for my $run (qw(RUN_PRE RUN RUN_POST)) {
 				runit( $run, !$run =~ /PRE/ );    # update time only for RUN_PRE
@@ -367,6 +402,8 @@ evidencer.pl - A program to join servers and scripts
 
 ./suits/    Once you are done with your tests, move them away into a suit, still available
 
+./tmp/      A temporal directory to hold sub lists of servergroups when using hostnames_regexp
+
 To create a suits directory structure:
 ./evidencer -C -s MYAPPL
 
@@ -383,6 +420,7 @@ To create a suits directory structure:
  --createdirs Create directories if they do not exist
  --config $configuration_file   Read alternative cfg file
  --keep       Do not cleanup temporal files created to accomodate the @hostnames list
+ --noautofix  Do not skip running tests on servergroups that match multiple tests
  --suit <suit>
 
  Example:

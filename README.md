@@ -18,14 +18,17 @@ Combines test scripts to be run on servergroups. Combine it with a remote execut
 | --createdirs | Create directories if they do not exist |
 | --config $configuration_file| Read alternative cfg file|
 | --keep       |Do not cleanup temporal files created to accomodate the @hostnames list|
+| --noautofix  |Do not skip running tests on servergroups that match multiple tests|
 | --suit <suit> |search for scripts only from this suit|
 
+
+## Directories
 
 - `./servers/` Define a list of server by function.
 - `./scripts/` Define a list of tests, by function, to be run on those servers
 - `./results/` Just an empty directory to store results in (from an external program)
-- `./suits/`   Once you are done with your tests, move them away into a suit, still available
-
+- `./suits/`   Once you are done with your tests, move them into a suit, still available, but tucked away
+- `./temp/`    Directory used when you use `@hostnames_regexp`
 
 ## Example
 Say you have the following servergroups (files that contain servernames/ipadresses on each line)
@@ -124,7 +127,7 @@ Say we want to run, from the suit `JAVATRANSACTIONS` the test `JAVASERVER-SERVIC
 
 ## File naming
 
- For the servergroup, you can use a plus sign instead of an asterix, and these are the rules:
+ For the servergroup search argument (but not the servergroup filename itself), you can use a plus sign instead of an asterix, and these are the rules:
  + `+` expands to `*`
  + `++` expands to `*-*` unless sandwitched between words, and then it becomes `-*-`
  Here is a lookup table:
@@ -134,12 +137,39 @@ Say we want to run, from the suit `JAVATRANSACTIONS` the test `JAVASERVER-SERVIC
  +-A   ==>  *-A     A-+   ==>  A-*     A++   ==>  A-*
  A++B  ==>  A-*-B   A-+B  ==>  A-*B    A+-B  ==>  A*-B
 ```
- So if you have a servergroup called `APACHE-PROD-DMZ`, then `=++DMZ` would match that group.
+ So if you have a servergroup file called `APACHE-PROD-DMZ`, then `=++DMZ` would match that group.
  And `++PROD++`  would match `*-PROD-*`. These are glob expansions, which means it would match
  exactly what ls would match if you run:  `ls ./servers/*-PROD-*`
  
  Thus, a `./scripts/test1=` or `./scripts/test1=+` will match any servergroup.
  A `./scripts/test1=+ET`will match `*-ET` (all servergroups ending with `-ET`)
+ 
+ 
+### Test file naming
+For tests, you can use labels that are unique until the `=` divider. Then you can add a search string that matches potential servergroup files.
+For example:
+`QA_TEST-10=MARIADB++` 
+This would mean that there is a script called `QA_TEST-10`, which can be run on `MARIADB-*` servergroups, like `MARIADB-PROD-TEAM1`
+
+You can run all QA_TEST's with: `./evidencer QA_TEST-*=`
+
+#### example
+
+Say you have this test ("test1"), and you have two files, because the latter should run on the DMZ.
+```
+./scripts/test1=APACHE++      (matches APACHE-*)
+./scripts/test1=APACHE++DMZ   (matches APACHE-*-DMZ)
+```
+And your servergroups are:
+```
+./servers/APACHE-PROD-DMZ
+./servers/APACHE-PROD
+./servers/APACHE-QA
+```
+Then `APACHE-QA` and `APACHE-PROD` can only run on `test1=APACHE++`, but `APACHE-PROD-DMZ` actually matches both `test1=APACHE++` and `APACHE++DMZ`.
+In this case, because the string "APACHE++DMZ" is longer, it would run on `test1=APACHE++DMZ`, and will not run on `test1=APACHE++`
+(if you still want to run it on both, use the `-n` commandline parameter)
+caveat: Unfortunately, it does not look inside servergroups to make the server lists inside it unique. You must take care of that yourself. (there is no recursive expansion)
  
 ## evidencer.cfg
 The configuration file contains many variables you can set. You can also define your own (Just stick to what perl calls "word characters" letters, numbers and underscore)
