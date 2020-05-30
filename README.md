@@ -100,6 +100,10 @@ After moving your files you can run all tests from the `TEST_SUIT_NAME` like thi
 ```sh
 # ./evidencer -s TEST_SUIT_NAME =
 ```
+
+Optionally, you can add a `./suits/TEST_SUIT_NAME/evidencer.cfg` configuration file, and override settings only for that suit. Very handy for ALIAS entries to not polute other SUIT's.
+
+
 ### more examples
 
 Say we want to run, from the suit `JAVATRANSACTIONS` the test `JAVASERVER-SERVICES=` for servers in the `JAVA-ET` servergroup that match the perl regexp `javaserver00[1..5]` or the substring `javaserver0100`
@@ -174,9 +178,10 @@ All variables that have to do with running found combinations of servers and scr
 ### TIME related variables
 These are supposed to be read-only because evidencer makes them available. Handy for using in RUN scripts to log to a file with a timedate stamp. Note that you can alias these, so if you like, create something like:
 ```
-ALIAS YMD=%{YEAR}-%{MONTH}-%{DAY}`
+YMD=%{YEAR}-%{MONTH}-%{DAY}
+YMDHM=%{YMD}_%{HH}%{MM}
 ```
-Which you can use in your RUN definition and it expands to an ISO datestring:
+Which you can use in your RUN definition and it expands to an ISO datestring but only just before running (before RUN_START, RUN_PRE (even when undefined) and RUN_FINISH):
 ```
 RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTSDIR}/HEADER.sh %{RUNSCRIPTFQ}|tee -a %{RUNRESULTSDIR}/%{RUNNAME}-%{YMD}.log
 ```
@@ -188,16 +193,21 @@ RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTSDIR}/HEADER.sh %{RUNSCRIPTFQ}|
 |SS|Time seconds (00..23)|
 |WD|Weekday 1=Monday ... 6=Saturday, 7=Sunday|
 |YD|Yearday. Day of the year, in the range 001..365 (or 001..366 if leap year)|
-|DAY|day of the month|
+|DAY|day of the month (01..)|
 |MONTH|01=jan ... 12=dec|
 |YEAR|4 digits year|
 |DS|daylightsaving|
 |TOTALTIME|Total seconds running the evidencer script|
 
-
+The time is localtime by default, but it can be `UTC` if you define it like true-ish in your evidencer.cfg file:
+`UTC=1`
 
 ### Test case run (RUN_PRE, RUN, RUN_POST)
-These run for each test (a valid script and server combination). RUN_PRE is the only one from this group that get's it's timedate variables updated, so you can re-use them in all the three and they will have the same values.
+These run for each test (a valid script and server combination). Everthing written will be executed by the shell. You can use `%{*}` variables to be expanded just before it runs.
+RUN_PRE is the only one from this group that get's it's timedate variables updated, so you can re-use them in all the three and they will have the same values.
+
+#### example
+`RUN=echo "I would run %{RUNSCRIPT} on %{RUNSERVER}"`
 
 ### Global run (RUN_START, RUN_FINISH, RUN_ABORT)
 These are executed only at the absolute start, end, and when evidencer dies from a fatal error.

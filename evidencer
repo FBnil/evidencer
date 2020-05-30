@@ -10,7 +10,8 @@ use feature 'say';
 #use lib (dirname abs_path $0) . '/lib';
 
 my $CFGFILE;
-my %CFG = (
+my %CFG;
+my %BASECFG = (
 	PID     => $$,
 	UTC     => 0,
 	NEWLINE => "\n",
@@ -24,12 +25,12 @@ GetOptions(
 	'help!'      => \$opt_help,
 	'man!'       => \$opt_man,
 	'config=s'   => \$CFGFILE,
-	'DEBUG'      => \$CFG{DEBUG},
-	'verbose'    => \$CFG{VERBOSE},
-	'dryrun'     => \$CFG{DRYRUN},
-	'UTC'        => \$CFG{UTC},
-	'CREATEDIRS' => \$CFG{CREATEDIRS},
-	'keep'       => \$CFG{KEEP},
+	'DEBUG'      => \$BASECFG{DEBUG},
+	'verbose'    => \$BASECFG{VERBOSE},
+	'dryrun'     => \$BASECFG{DRYRUN},
+	'UTC'        => \$BASECFG{UTC},
+	'CREATEDIRS' => \$BASECFG{CREATEDIRS},
+	'keep'       => \$BASECFG{KEEP},
 	'suit:s'     => \$SUIT,
 ) or pod2usage( -verbose => 0 );
 
@@ -40,35 +41,47 @@ pod2usage( -verbose => 1 ) if defined $opt_help;
 pod2usage( -verbose => 2 ) if defined $opt_man;
 
 # Make sure at least one argument provided
-if ( !@ARGV && !$CFG{'CREATEDIRS'} ) {
+if ( !@ARGV && !$BASECFG{'CREATEDIRS'} ) {
 	pod2usage( -verbose => 0, -message => "$0: one argument required" );
 }
 
 # Read configuration file
+sub readCFG
 {
+	my ( $NEWCFG, $NEWSUIT ) = @_;
+	$NEWCFG  = $NEWCFG  || '';
+	$NEWSUIT = $NEWSUIT || '';
 	my $me      = abs_path( dirname($0) ) . '/' . basename($0);
 	my $BASEDIR = dirname $me;
 	%CFG = (
-		%CFG,
+		%BASECFG,
 		(
-			'BASEDIR' => $BASEDIR,
-			'TEMP'    => $BASEDIR . "/tmp",
-			'SUITDIR' => $BASEDIR . "/suits",
-			'SUIT'    => '..',
-			'SERVERS' => 'servers',
-			'SCRIPTS' => 'scripts',
-			'RESULTS' => 'results',
+			'BASEDIR'        => $BASEDIR,
+			'TEMP'           => $BASEDIR . "/tmp",
+			'SUITDIR'        => $BASEDIR . "/suits",
+			'SUIT'           => '..',
+			'SERVERS'        => 'servers',
+			'SCRIPTS'        => 'scripts',
+			'RESULTS'        => 'results',
+			'_SELECTED_SUIT' => $NEWSUIT || '..',
 		)
 	);
 	updateTime( \%CFG );    # cfgfile might need the variables.
 	my ( $name, $path, $suffix ) = fileparse( $me, '.pl' );
-	my $CFGFILE = $path . $name . '.cfg';
-	-f $CFGFILE
-	  || -f ( $CFGFILE = $path . 'cfg/' . $name . '.cfg' )
-	  || -f ( $CFGFILE = $path . '../cfg/' . $name . '.cfg' );
-	if ( -f $CFGFILE ) {
-		$CFG{'CFGFILE'} = $CFGFILE;
-		open( my $CFG, '<', $CFGFILE ) or abort("$CFGFILE $!");
+	my $_CFGFILE =
+	  $NEWCFG
+	  || ($NEWSUIT
+		? $CFG{'SUITDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
+		: $path . $name . '.cfg' );
+		 -f $_CFGFILE
+	  || -f ( $_CFGFILE = $path . $name . '.cfg' )
+	  || -f ( $_CFGFILE = $path . 'cfg/' . $name . '.cfg' )
+	  || -f ( $_CFGFILE = $path . '../cfg/' . $name . '.cfg' );
+
+	if ( -f $_CFGFILE ) {
+		$CFG{'CFGFILE'} = $_CFGFILE;
+		say "readCFG($NEWCFG,$NEWSUIT)=$_CFGFILE" if $BASECFG{'VERBOSE'};
+		open( my $CFG, '<', $_CFGFILE ) or abort("$_CFGFILE $!");
 		my %DIRS = map { $_ => 1 } qw(TEMP);
 		while (<$CFG>) {
 			next if /^#/ || !/=/;
@@ -86,6 +99,7 @@ if ( !@ARGV && !$CFG{'CREATEDIRS'} ) {
 	}
 }
 
+readCFG( $CFGFILE, $SUIT );
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 
 sub md
@@ -113,15 +127,15 @@ if ( $CFG{'CREATEDIRS'} ) {
 pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR'}\n" )
   unless -d $CFG{'SUITDIR'};
 
-my %SCRIPT_FILES;
-my @REG_SCRIPTS;
-my @REG_SERVERS;
-
 # Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
 for my $arg (@ARGV) {
+	my %SCRIPT_FILES;
+	my @REG_SCRIPTS;
+	my @REG_SERVERS;
 	say "Processing ARG: $arg" if $CFG{'VERBOSE'};
 	my ( $suit, $scripts ) =
 	  index( $arg, ':' ) > -1 ? split( ':', $arg, 2 ) : ( $SUIT || $CFG{'SUIT'}, $arg );
+	readCFG( $CFGFILE, $suit ) if ( $CFG{'_SELECTED_SUIT'} ne $suit );
 	my $hoststr;
 	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $arg, '@' ) > -1;
 
@@ -131,6 +145,12 @@ for my $arg (@ARGV) {
 	$scripts =~ s/^=/*=/;
 	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 	$suit    =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+
+# allow for ALIASes to have %{} variables, and be expanded inside $scripts (but why did you use variables?).
+	if ( index( $scripts, "%{" ) > -1 ) {
+		updateTime( \%CFG );
+		my $v = xexpand( $scripts, '%\{(\w+)\}', \%CFG );
+	}
 
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
 	my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
