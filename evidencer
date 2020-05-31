@@ -13,6 +13,7 @@ my $CFGFILE;
 my %CFG;
 my %BASECFG = (
 	PID     => $$,
+	N       => 0,
 	UTC     => 0,
 	NEWLINE => "\n",
 );
@@ -128,6 +129,8 @@ if ( $CFG{'CREATEDIRS'} ) {
 pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR'}\n" )
   unless -d $CFG{'SUITDIR'};
 
+runit('RUN_BEGIN');
+
 # Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
 for my $arg (@ARGV) {
 	my %SCRIPT_FILES;
@@ -229,6 +232,7 @@ for my $arg (@ARGV) {
 		no warnings;
 		say "DEBUG: Variables list";
 		updateTime( \%CFG );
+		$CFG{N} += 1;    # simulate %{N} being set somewhat correctly.
 		for my $key ( sort keys %CFG ) {
 			say " \%{$key}=$CFG{$key}";
 		}
@@ -302,6 +306,8 @@ for my $arg (@ARGV) {
 			say "# SCRIPT=$CFG{RUNSCRIPTFQ}"           if $CFG{'VERBOSE'};
 			say "# SERVER=$CFG{RUNSERVERFQ}"           if $CFG{'VERBOSE'};
 
+			$CFG{N} = $BASECFG{N} +=
+			  1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
 			for my $run (qw(RUN_PRE RUN RUN_POST)) {
 				runit( $run, !$run =~ /PRE/ );    # update time only for RUN_PRE
 			}
@@ -315,7 +321,9 @@ if ( !$CFG{'KEEP'} ) {
 	}
 }
 
-runit('RUN_FINISH');
+runit('RUN_FINISH') if $BASECFG{RUN_STARTED};
+runit('RUN_END');
+exit 0;
 
 # allow executing ABORTMSG before die (usually from lacking permissions to read/write files)
 sub abort
@@ -333,10 +341,10 @@ sub runit
 		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
 		if ( $CFG{DRYRUN} ) {
-			say $CFG{RUN_START} if ( defined $CFG{RUN_START} && !$CFG{RUN_STARTED}++ );
+			say $CFG{RUN_START} if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ );
 			say $_;
 		} else {
-			if ( defined $CFG{RUN_START} && !$CFG{RUN_STARTED}++ ) {
+			if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ ) {
 				say $CFG{RUN_START} if $CFG{'VERBOSE'};
 				system $CFG{RUN_START};
 			}

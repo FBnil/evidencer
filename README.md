@@ -188,6 +188,8 @@ All variables that have to do with running found combinations of servers and scr
 
 | RUN Variable | What it does|
 |----|---|
+|PID|The process ID of the currently running evidencer use it as: `%{PID}`. Combine with `%{N}` for unique filenames|
+|N|A number that increases just before you use the: `RUN_PRE`, `RUN` and `RUN_POST`. Use it like: `%{N}`|
 |RUNSCRIPTSDIR|The directory where the scripts are located, basically: `%{SUITDIR}`/`%{SUIT}`/`%{SCRIPTS}`|
 |RUNSERVERSDIR|The directory where the servergroups are located, basically: `%{SUITDIR}`/`%{SUIT}`/`%{SERVERS}`|
 |RUNSUIT|The currently running suit|
@@ -200,10 +202,12 @@ All variables that have to do with running found combinations of servers and scr
 |RUN|Execute this string in the shell|
 |RUN_POST|Execute this string in the shell. Runs after `RUN`|
 |KEEP|Set to true(1) to keep temporal files created when @hostnames is used|
-|RUN_START|Run just before the first `RUN_PRE` is ran|
-|RUN_FINISH|Runs at the very end of the evidencer script|
+|RUN_START|Run just before the first `RUN_PRE` is ran. If no scripts+servers is matched, then this does not trigger either|
+|RUN_FINISH|Runs at the very end of the evidencer script, only if `RUN_START` ran|
+|RUN_BEGIN|This always runs at the beginning|
+|RUN_END|This always runs at the end. It has access to a number `%{N}` if it is zero, nothing actually ran|
 |ABORTMSG|The fatal errormessage will be available to `RUN_ABORT` to do something with it (for example:log it)|
-|RUN_ABORT|Execute this string in the shell|
+|RUN_ABORT|Execute this string in the shell when a fatal error occurred: When evidencer could not read or create a file it needs to run|
 
 ### TIME related variables
 These are supposed to be read-only because evidencer makes them available. Handy for using in RUN scripts to log to a file with a timedate stamp. Note that you can alias these, so if you like, create something like:
