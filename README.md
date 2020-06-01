@@ -1,5 +1,5 @@
 # evidencer
-Combines test scripts to be run on servergroups. Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/rundeer)/[ssh-batch](https://github.com/hans-vervaart/ssh-batch) or similar to produce results called "evidence".
+Say you have script files in one directory, and lists of files with servernames in the other, and you want to combine those to run certain scripts on certain servergroups. Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/rundeer)/[ssh-batch](https://github.com/hans-vervaart/ssh-batch) or similar to produce results called "evidence".
 
 ## Usage
 ```
@@ -16,9 +16,13 @@ Combines test scripts to be run on servergroups. Combine it with a remote execut
 | --dryrun     |Do not execute, but show all that would have been run|
 | --UTC        |timestrings are in UTC instead of localtime |
 | --createdirs | Create directories if they do not exist |
-| --config $configuration_file| Read alternative cfg file|
+| --config <cfg_file>| Read alternative cfg file|
 | --keep       |Do not cleanup temporal files created to accomodate the @hostnames list|
 | --noautofix  |Do not skip running tests on servergroups that match multiple tests|
+| --unfold     |If you have files in your servergroups, recursively read the servers.|
+| --fold       |Group by Scripts|
+| --group      |Group by Servergroups|
+| --SEPARATOR  |The separation characters between folded and group items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit|
 
 
@@ -70,15 +74,15 @@ RUN=./bin/rundeer -m ./%{SCRIPTS}/%{RUNSCRIPT} -f ./%{SERVERS}/%{RUNSERVER} >> %
 
 Now, from the commandline, you can run:
 ```sh
-# ./evidencer -v -d test2=
+./evidencer -v -d test2=
 ```
 It will verbosely say what it would do (dryrun). In this case show the commands for each test2=* on all it's matching servergroups
 ```sh
-# ./evidencer test2=+ACCP  or ./evidencer test2=HTTPD-ACCP  or ./evidencer test2=APACHE-WEBSERVERS-ACCP
+./evidencer test2=+ACCP  or ./evidencer test2=HTTPD-ACCP  or ./evidencer test2=APACHE-WEBSERVERS-ACCP
 ```
 This will run test2 only on the ACCP machines
 ```sh
-# ./evidencer test2=+ACCP@host00[1..5]
+./evidencer test2=+ACCP@host00[1..5]
 ```
 This will run test2 only on the machines host001 to host005 machines but only if they are found in `./servers/*ACCP`
 The `@hostnames` regexp's are not un-ALIAS-ed. Don't forget to escape or quote.
@@ -127,7 +131,7 @@ Say we want to run, from the suit `JAVATRANSACTIONS` the test `JAVASERVER-SERVIC
 
 ## File naming
 
- For the servergroup search argument (but not the servergroup filename itself), you can use a plus sign instead of an asterix, and these are the rules:
+ For the servergroup search argument, and the scriptnames after the `=` (but not the servergroup filename itself), you can use a plus sign instead of an asterix, and these are the rules:
  + `+` expands to `*`
  + `++` expands to `*-*` unless sandwitched between words, and then it becomes `-*-`
  Here is a lookup table:
@@ -137,25 +141,27 @@ Say we want to run, from the suit `JAVATRANSACTIONS` the test `JAVASERVER-SERVIC
  +-A   ==>  *-A     A-+   ==>  A-*     A++   ==>  A-*
  A++B  ==>  A-*-B   A-+B  ==>  A-*B    A+-B  ==>  A*-B
 ```
- So if you have a servergroup file called `APACHE-PROD-DMZ`, then `=++DMZ` would match that group.
+ So if you have a servergroup file called `APACHE-PROD-DMZ`, then `=++DMZ` would match that group. As would `=+DMZ` but with the danger that you match `ALL-TESTDMZ` because that matches `*DMZ`, but not `*-DMZ`.
  And `++PROD++`  would match `*-PROD-*`. These are glob expansions, which means it would match
  exactly what ls would match if you run:  `ls ./servers/*-PROD-*`
+ So in this case, naming your test `dmztest4apache=APACHE++DMZ` (matches `APACHE-*-DMZ`), would match `APACHE-PROD-DMZ` better.
  
  Thus, a `./scripts/test1=` or `./scripts/test1=+` will match any servergroup.
- A `./scripts/test1=+ET`will match `*-ET` (all servergroups ending with `-ET`)
+ A `./scripts/test1=+ET`will match `*ET` (all servergroups ending with `ET`)
+ A `./scripts/test1=++ET`will match `*-ET` (all servergroups ending with `-ET`)
  
  
-### Test file naming
-For tests, you can use labels that are unique until the `=` divider. Then you can add a search string that matches potential servergroup files.
+### Scripts file naming
+For scripts, you can use labels that are unique until the `=` divider. Then you can add a search string that matches potential servergroup files.
 For example:
 `QA_TEST-10=MARIADB++` 
-This would mean that there is a script called `QA_TEST-10`, which can be run on `MARIADB-*` servergroups, like `MARIADB-PROD-TEAM1`
+This would mean that there is a test script called `QA_TEST-10`, which can be run on `MARIADB-*` servergroups, like `MARIADB-PROD-TEAM1`
 
 You can run all QA_TEST's with: `./evidencer QA_TEST-*=`
 
 #### example
 
-Say you have this test ("test1"), and you have two files, because the latter should run on the DMZ.
+Say you have a test (let's call it "test1"), and you have two files for that test, because the latter should run on the DMZ (so the test has to be scripted differently).
 ```
 ./scripts/test1=APACHE++      (matches APACHE-*)
 ./scripts/test1=APACHE++DMZ   (matches APACHE-*-DMZ)
@@ -168,7 +174,7 @@ And your servergroups are:
 ```
 Then `APACHE-QA` and `APACHE-PROD` can only run on `test1=APACHE++`, but `APACHE-PROD-DMZ` actually matches both `test1=APACHE++` and `APACHE++DMZ`.
 In this case, because the string "APACHE++DMZ" is longer, it would run on `test1=APACHE++DMZ`, and will not run on `test1=APACHE++`
-(if you still want to run it on both, use the `-n` commandline parameter)
+(if you still want to run it on both, use the `--noautofix` commandline parameter)
 caveat: Unfortunately, it does not look inside servergroups to make the server lists inside it unique. You must take care of that yourself. (there is no recursive expansion)
  
 ## evidencer.cfg
@@ -237,16 +243,79 @@ The time is localtime by default, but it can be `UTC` if you define it like true
 `UTC=1`
 
 ### Test case run (RUN_PRE, RUN, RUN_POST)
-These run for each test (a valid script and server combination). Everthing written will be executed by the shell. You can use `%{*}` variables to be expanded just before it runs.
-RUN_PRE is the only one from this group that get's it's timedate variables updated, so you can re-use them in all the three and they will have the same values.
+These run for each test (a valid script and server combination). Everthing written will be executed by the shell. You can use `%{ }` variables to be expanded just before it runs.
+RUN_PRE is the only one from this group that get's it's timedate variables updated, so you can re-use them in all the three (`RUN_PRE`, `RUN` and `RUN_POST`) and they will have the same values.
 
 #### example
-`RUN=echo "I would run %{RUNSCRIPT} on %{RUNSERVER}"`
+```
+RUN=echo "I would run %{RUNSCRIPTFQ} on %{RUNSERVERFQ}"
+```
 
 ### Global run (RUN_START, RUN_FINISH, RUN_ABORT)
-These are executed only at the absolute start, end, and when evidencer dies from a fatal error.
-RUN_ABORT also gets to use the variable `%{ABORTMSG}`, for example:
-`RUN_ABORT=echo "%{ABORTMSG}" >> /tmp/evidencer-crash.log`
+These are executed only once, before the first script (`RUN_PRE`, `RUN` and `RUN_POST`) is run. And if there is no scripts + servers combination found that is to run, the `RUN_START` and `RUN_END` is not run. 
+The `RUN_FINISH` runs after the last script has run.
+When evidencer dies from a fatal erro `RUN_ABORT` is run. It also gets to use the variable `%{ABORTMSG}`, for example:
+```
+RUN_ABORT=echo "%{ABORTMSG}" >> /tmp/evidencer-crash.log
+```
+
+### Global run (RUN_BEGIN, RUN_END)
+
+`RUN_BEGIN` runs at the beginning of ./evidencer (before `RUN_START`), `RUN_END` at the end, (after `RUN_FINISH`).
+
+### FOLD and GROUP
+Sometimes, you need to group the servers or the scripts to reduce the amount of calls you make to ssh. The separator used by default is "  " (two spaces), but you can override it by setting `--SEPARATOR` to another character(s).
+
+To see what it would do with your scripts and servers, use `--dryrun` and `--verbose` in combination with `--fold` and `--group`. and grep on the word 'RUN'
+
+```sh
+./evidencer [-s TEST_SUIT_NAME] = -d -v [-f] [-g] |grep RUN
+```
+Note that the line starting with `# RUN(` removes the paths for readability, but `%{RUNSCRIPTFQ}` and `%{RUNSERVERFQ}` contain the paths for each.
+
+Let's explain it visually. For this example, we have the following scripts and servers:
+|scripts|
+|----|
+|test1=VM+|
+|test2=VM-ET|
+|test3=VM+|
+
+|servers|
+|----|
+|VM-ET|
+|VM-PR|
+
+Normally, if we run `"="` (all scripts) this would iterate and run the following:
+|run script|on servergroup|
+|---|---|
+|test1=VM+|VM-ET|
+|test1=VM+|VM-PR|
+|test2=VM-ET|VM-ET|
+|test3=VM+|VM-ET|
+|test3=VM+|VM-PR|
+
+#### fold
+Using `-f` or `--fold` would fold the scripts like so:
+
+|run script|on servergroup|
+|---|---|
+|test1=VM+ test2=VM-ET test3=VM+|VM-ET|
+|test1=VM+ test3=VM+|VM-PR|
 
 
+#### group
+Using `-g` or `--group` would group the servergroups like so:
 
+|run script|on servergroup|
+|---|---|
+|test1=VM+|VM-ET VM-PR|
+|test2=VM-ET|VM-ET|
+|test3=VM+|VM-ET VM-PR|
+
+#### group and fold
+You can combine `--fold` and `--group` on the commandline, and that would RUN like so:
+
+|run script|on servergroup|
+|---|---|
+|test1=VM+ test3=VM+|VM-ET VM-PR|
+|test2=VM-ET |VM-ET|
