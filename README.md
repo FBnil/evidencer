@@ -172,7 +172,7 @@ And your servergroups are:
 ./servers/APACHE-PROD
 ./servers/APACHE-QA
 ```
-Then `APACHE-QA` and `APACHE-PROD` can only run on `test1=APACHE++`, but `APACHE-PROD-DMZ` actually matches both `test1=APACHE++` and `APACHE++DMZ`.
+Then `APACHE-QA` and `APACHE-PROD` can only run on `test1=APACHE++`, but `APACHE-PROD-DMZ` actually matches both `test1=APACHE++` and `test1=APACHE++DMZ`.
 In this case, because the string "APACHE++DMZ" is longer, it would run on `test1=APACHE++DMZ`, and will not run on `test1=APACHE++`
 (if you still want to run it on both, use the `--noautofix` commandline parameter)
 caveat: Unfortunately, it does not look inside servergroups to make the server lists inside it unique. You must take care of that yourself. (there is no recursive expansion)
@@ -265,6 +265,7 @@ RUN_ABORT=echo "%{ABORTMSG}" >> /tmp/evidencer-crash.log
 
 ### FOLD and GROUP
 Sometimes, you need to group the servers or the scripts to reduce the amount of calls you make to ssh. The separator used by default is "  " (two spaces), but you can override it by setting `--SEPARATOR` to another character(s).
+Caveat: If you use this functionality, please stick to a single suit (you can address multiple scripts/servers in the commandline, as long as their directories are the same).
 
 To see what it would do with your scripts and servers, use `--dryrun` and `--verbose` in combination with `--fold` and `--group`. and grep on the word 'RUN'
 
