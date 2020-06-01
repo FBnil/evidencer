@@ -298,7 +298,7 @@ for my $arg (@ARGV) {
 				next unless @servers;    # no matches, skip this test
 					 # only create a temporal file if we do not match ALL servers in this group.
 				if ( $#servers + 1 < $counter || ( $CFG{'UNFOLD'} || 0 ) > 1 ) {
-					$CFG{'UNFOLD'} = 1 if $CFG{'UNFOLD'} > 1;
+					$CFG{'UNFOLD'} = 1 if defined( $CFG{'UNFOLD'} ) && $CFG{'UNFOLD'} > 1;
 					my $tempfile =
 					  ( $suit eq ".." ? '_' : $suit ) . '#' . $script . '#' . $CFG{PID};
 					push @{ $CFG{_CLEANUP} }, ( $CFG{RUNSERVERFQ} = $CFG{TEMP} . '/' . $tempfile );
@@ -509,7 +509,7 @@ To create a suits directory structure:
  --unfold     If you have files in your servergroups, recursively read the servers.
  --fold       Group by Scripts
  --group      Group by Servergroups
- --SEPARATOR  The separation characters between folded and group items. (default is double space)
+ --SEPARATOR  The separation characters between folded and grouped items. (default is double space)
  --suit <suit>  Only consider this suit for all script-server matches
 
  Example:

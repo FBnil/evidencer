@@ -22,7 +22,7 @@ Say you have script files in one directory, and lists of files with servernames 
 | --unfold     |If you have files in your servergroups, recursively read the servers.|
 | --fold       |Group by Scripts|
 | --group      |Group by Servergroups|
-| --SEPARATOR  |The separation characters between folded and group items. (default is double space)|
+| --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit|
 
 
@@ -94,6 +94,11 @@ This will match `++WEBSERVERS++DMZ`, which is `*-WEBSERVERS-*-DMZ` thus matches:
 # ./evidencer =
 ```
 Just run everything... from ./scripts/ on ./servers/
+
+```sh
+# ./evidencer @host001
+```
+Find all that is runnable for host001, and run it.
 
 ## SUITS
 once you are done with the tests, or you have multiple tests, and do not want to overlap things, move your `./servers/*` and `./scripts/*` into a subdirectory
@@ -320,3 +325,7 @@ You can combine `--fold` and `--group` on the commandline, and that would RUN li
 |---|---|
 |test1=VM+ test3=VM+|VM-ET VM-PR|
 |test2=VM-ET |VM-ET|
+
+## I don't like perl
+
+We have a script: evidencer.sh that does the basics.
