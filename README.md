@@ -1,5 +1,6 @@
 # evidencer
-Say you have script files in one directory, and lists of files with servernames in the other, and you want to combine those to run certain scripts on certain servergroups. Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/rundeer)/[ssh-batch](https://github.com/hans-vervaart/ssh-batch) or similar to produce results called "evidence".
+Say you have script files in one directory, and lists of files with servernames in the other, and you want to combine those to run certain scripts on certain servergroups. By cleverly naming the scripts and the servergroup files, you restrict what can run where. Add a few filters to select which scripts, and on which servers you want to run these scripts and you get evidencer.
+Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/rundeer)/[ssh-batch](https://github.com/hans-vervaart/ssh-batch) or similar to produce output (results) you can store on the machine you are running from. Store the output with timedate stamps, and the results become historical "evidence".
 
 ## Usage
 ```
@@ -89,7 +90,7 @@ The `@hostnames` regexp's are not un-ALIAS-ed. Don't forget to escape or quote.
 ```sh
 # ./evidencer test3
 ```
-This will match `++WEBSERVERS++DMZ`, which is `*-WEBSERVERS-*-DMZ` thus matches: `NGINX-WEBSERVERS-PROD-DMZ` and `APACHE-WEBSERVERS-PROD-DMZ`
+This will match all test3 scripts, and because we only have one script `test3=++WEBSERVERS++DMZ`, it would match the servers that match `++WEBSERVERS++DMZ`, which is `*-WEBSERVERS-*-DMZ` thus matches: `NGINX-WEBSERVERS-PROD-DMZ` and `APACHE-WEBSERVERS-PROD-DMZ`
 ```sh
 # ./evidencer =
 ```
@@ -221,7 +222,7 @@ All variables that have to do with running found combinations of servers and scr
 |RUN_ABORT|Execute this string in the shell when a fatal error occurred: When evidencer could not read or create a file it needs to run|
 
 ### TIME related variables
-These are supposed to be read-only because evidencer makes them available. Handy for using in RUN scripts to log to a file with a timedate stamp. Note that you can alias these, so if you like, create something like:
+These are supposed to be read-only because evidencer makes them available. Handy for using in RUN scripts to log to a file with a timedate stamp. Note that you can alias these, so inside evidencer.cfg, add something like:
 ```
 YMD=%{YEAR}-%{MONTH}-%{DAY}
 YMDHM=%{YMD}_%{HH}%{MM}
