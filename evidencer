@@ -260,7 +260,8 @@ for my $arg (@ARGV) {
 		$CFG{RUNRESULTSDIR} = $resultsdir = abs_path $resultsdir;
 		for my $suitserver ( grep { !/^!$/ } sort keys %{ $SCRIPT_FILES{$suitscript} } ) {
 			if ( $SCRIPT_FILES{$suitscript}{$suitserver} == 0 ) {
-				say "SKIPPING $suitscript $suitserver" if $CFG{'DEBUG'};
+				say "SKIPPING $suitscript $suitserver ($SCRIPT_FILES{$suitscript}{$suitserver})"
+				  if $CFG{'DEBUG'};
 				next;
 			}
 			my ( $suit, $server ) = split ":", $suitserver, 2;
@@ -367,8 +368,10 @@ if (%DEFER) {
 				say "# SERVER=$CFG{RUNSERVERFQ}";
 			}
 			$CFG{N} = $BASECFG{N} += 1;
+			my $EC;
 			for my $run (qw(RUN_PRE RUN RUN_POST)) {
-				runit( $run, !$run =~ /PRE/ );    # update time only for RUN_PRE
+				$EC = runit( $run, $run ne "RUN_PRE" );    # update time only for RUN_PRE
+				last if ( $EC && $run eq "RUN_PRE" );
 			}
 		}
 	}
@@ -396,8 +399,9 @@ sub abort
 # Run (or dryrun) the commands defined as RUN... in the cfg file
 sub runit
 {
-	if ( $_ = $CFG{ $_[0] } ) {
-		updateTime( \%CFG ) unless $_[1];
+	my ( $KEY, $no_time_update ) = @_;
+	if ( $_ = $CFG{$KEY} ) {
+		updateTime( \%CFG ) unless $no_time_update;
 		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
 		if ( $CFG{DRYRUN} ) {
@@ -409,9 +413,14 @@ sub runit
 				system $CFG{RUN_START};
 			}
 			say $_ if $CFG{'VERBOSE'};
-			system $_;
+			my $ec = system $_;
+			say " # ExitCode=$?" if $CFG{'VERBOSE'};
+			$CFG{'ERRORCODE'} = $ec >> 8;
+			runit( $KEY . "_FAIL", 1 ) if ( $ec && $KEY !~ /_FAIL$/ && $CFG{ $KEY . "_FAIL" } );
+			return $ec;
 		}
 	}
+	return 0;
 }
 
 # transform lazy search into a glob-able pattern

@@ -182,7 +182,7 @@ Then `APACHE-QA` and `APACHE-PROD` can only run on `test1=APACHE++`, but `APACHE
 In this case, because the string "APACHE++DMZ" is longer, it would run on `test1=APACHE++DMZ`, and will not run on `test1=APACHE++`
 (if you still want to run it on both, use the `--noautofix` commandline parameter)
 caveat: Unfortunately, it does not look inside servergroups to make the server lists inside it unique. You must take care of that yourself. (there is no recursive expansion)
- 
+
 ## evidencer.cfg
 The configuration file contains many variables you can set. You can also define your own (Just stick to what perl calls "word characters" letters, numbers and underscore)
 | CFG Variable | What it does|
@@ -220,6 +220,30 @@ All variables that have to do with running found combinations of servers and scr
 |RUN_END|This always runs at the end. It has access to a number `%{N}` if it is zero, nothing actually ran|
 |ABORTMSG|The fatal errormessage will be available to `RUN_ABORT` to do something with it (for example:log it)|
 |RUN_ABORT|Execute this string in the shell when a fatal error occurred: When evidencer could not read or create a file it needs to run|
+
+All `RUN*` commands have a `*_FAIL` counterpart. If the exitcode of the command is nonzero, then the `*_FAIL` will be run.
+The `RUN_PRE` is a special case, when RUN_PRE returns with a nonzero exitcode, then RUN_PRE_FAIL will run, and then `RUN` and `RUN_POST` will be skipped. To override this, end your command with `;true`.
+
+
+#### example
+
+```sh
+RUN_PRE=ls /tmp/fobaar ; true
+RUN_PRE_FAIL=echo "I will never run because RUN_PRE returns always zero/true"
+RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
+RUN_FAIL=echo "B0RKEN %{RUNNAME} %{ERRORCODE}" >> %{RUNRESULTSDIR}/%{RUNNAME}.err
+RUN_POST=ls /tmp/pqowieur | tee -a /tmp/log.log ; . ./bin/ec.1
+RUN_POST_FAIL=echo "I will run if the file /tmp/pqowieur does not exist"
+```
+Interesting case is the one presented with `RUN_POST`. The tee is handy, because you get output while it runs, however, it always returns true if itself is able to store/append to the logfile. It does not propagate the error from the previous command. To do this, we use `test ${PIPESTATUS[0]} -eq 0`, however, Perl interpolates `$` as a variable, so you need to wrap it in a script, and then source it.
+
+The content of `./bin/ec.1` is:
+```
+test ${PIPESTATUS[0]} -eq 0
+
+```
+##### Read more about pipes
+https://unix.stackexchange.com/questions/14270/get-exit-status-of-process-thats-piped-to-another
 
 ### TIME related variables
 These are supposed to be read-only because evidencer makes them available. Handy for using in RUN scripts to log to a file with a timedate stamp. Note that you can alias these, so inside evidencer.cfg, add something like:
@@ -329,4 +353,25 @@ You can combine `--fold` and `--group` on the commandline, and that would RUN li
 
 ## I don't like perl
 
-We have a script: evidencer.sh that does the basics.
+We have a script: evidencer.sh that does the basics, and might be just enough.
+
+```sh
+SCRIPT=$1
+IFS='=' read -ra ARR <<< "$SCRIPT"
+SERVERGROUP=$(echo "${ARR[1]}"|sed 's/++/*-*/g'|tr '+' '*')
+echo "# ($SCRIPT) -> ${ARR[0]}=$SERVERGROUP "
+ls ./scripts/${ARR[0]}=$SERVERGROUP | while read script;do
+    IFS='=' read -ra ARR <<< "$script"
+    SERVERGROUP=$(echo "${ARR[1]}"|sed 's/++/*-*/g'|tr '+' '*')
+    echo "# ($SCRIPT)->$script ($SERVERGROUP) "
+    ls ./servers/$SERVERGROUP | while read servers;do
+        echo "#ACTION: run $script on $servers"
+    done
+done
+```
+
+### usage example
+```
+./evidencer.sh test*=++ET
+./evidencer.sh *=*
+```
