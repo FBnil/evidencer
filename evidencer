@@ -19,7 +19,7 @@ my %BASECFG = (
 	NEWLINE   => "\n",
 	SEPARATOR => "  ",
 );
-my $SUIT = "";
+my $SUIT = $ENV{'SUIT'} || "";
 
 my %opt;
 my ( $opt_help, $opt_man );
