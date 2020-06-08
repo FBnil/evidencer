@@ -24,7 +24,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --fold       |Group by Scripts|
 | --group      |Group by Servergroups|
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
-| --suit <suit> |search for scripts only from this suit|
+| --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
 
 ## Directories
@@ -85,21 +85,30 @@ This will run test2 only on the ACCP machines
 ```sh
 ./evidencer test2=+ACCP@host00[1..5]
 ```
-This will run test2 only on the machines host001 to host005 machines but only if they are found in `./servers/*ACCP`
+This will run `test2` only on the machines host001 to host005 machines but only if they are found in `./servers/*ACCP`
 The `@hostnames` regexp's are not un-ALIAS-ed. Don't forget to escape or quote.
 ```sh
-# ./evidencer test3
+./evidencer test2=HTTPD-ACCP@#1,#2
+```
+Run the `test2` only the first and second server from the `HTTPD-ACCP` list
+```sh
+./evidencer test3
 ```
 This will match all test3 scripts, and because we only have one script `test3=++WEBSERVERS++DMZ`, it would match the servers that match `++WEBSERVERS++DMZ`, which is `*-WEBSERVERS-*-DMZ` thus matches: `NGINX-WEBSERVERS-PROD-DMZ` and `APACHE-WEBSERVERS-PROD-DMZ`
 ```sh
-# ./evidencer =
+./evidencer =
 ```
 Just run everything... from ./scripts/ on ./servers/
 
 ```sh
-# ./evidencer @host001
+./evidencer @host001
 ```
 Find all that is runnable for host001, and run it.
+
+```sh
+./evidencer test2@host001
+```
+Run `test2` on host001 (only if any test2=* matches a servergroup that contains that server)
 
 ## SUITS
 once you are done with the tests, or you have multiple tests, and do not want to overlap things, move your `./servers/*` and `./scripts/*` into a subdirectory
@@ -292,6 +301,12 @@ RUN_ABORT=echo "%{ABORTMSG}" >> /tmp/evidencer-crash.log
 ### Global run (RUN_BEGIN, RUN_END)
 
 `RUN_BEGIN` runs at the beginning of ./evidencer (before `RUN_START`), `RUN_END` at the end, (after `RUN_FINISH`).
+
+### UNFOLD
+
+Sometimes, the servergroup files may contain nested files to other servergroups. If needed, then using this option, will detect such files and un-nest them to a temporal file. And this temporal file is used.
+Sometimes, the servergroups contain not only the servername/ipaddress on a line, but a space and some comment, or alias (you can @grep on). by using UNFOLD, it will also reduce the lines to only the hostname/ipaddress and use a temporal file.
+
 
 ### FOLD and GROUP
 Sometimes, you need to group the servers or the scripts to reduce the amount of calls you make to ssh. The separator used by default is "  " (two spaces), but you can override it by setting `--SEPARATOR` to another character(s).
