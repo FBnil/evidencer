@@ -198,6 +198,7 @@ for my $arg (@ARGV) {
 			my $scriptserver = $script;
 			$scriptserver =~ s/=\K.*/$server/;
 			my $scriptsreg = $scripts;
+			$scriptsreg .= '$';
 			globlize($scriptsreg);
 			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
 			my $matches = $scriptserver =~ /$scriptsreg/;
@@ -285,7 +286,8 @@ for my $arg (@ARGV) {
 					++$counter;
 					for my $regexp ( @{ $SCRIPT_FILES{$suitscript}{'!'} } ) {
 						say "looking if $_ matches $regexp" if $CFG{'DEBUG'};
-						if (m/$regexp/ix) {
+						if ( $regexp =~ /^#(\d+)/ ? $counter == $1 : m/$regexp/ix ) {
+							s/\s+.*//;
 							push @servers, $_;
 							last;
 						}
