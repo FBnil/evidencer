@@ -126,9 +126,9 @@ sub md
 if ( $CFG{'CREATEDIRS'} ) {
 	$SUIT = $SUIT || $CFG{'SUIT'};
 	my $c = 0;
-	$c += md( $CFG{$_} )                                       for (qw(TEMP SUITDIR));
-	$c += md( $CFG{'SUITDIR'} . '/' . $SUIT );
-	$c += md( $CFG{'SUITDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
+	$c += !!md( $CFG{$_} )                                       for (qw(TEMP SUITDIR));
+	$c += !!md( $CFG{'SUITDIR'} . '/' . $SUIT );
+	$c += !!md( $CFG{'SUITDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
 	say "$c directories created";
 	exit 0;
 }
@@ -199,8 +199,8 @@ for my $arg (@ARGV) {
 			my $scriptserver = $script;
 			$scriptserver =~ s/=\K.*/$server/;
 			my $scriptsreg = $scripts;
-			$scriptsreg .= '$';
 			globlize($scriptsreg);
+			$scriptsreg .= '$';
 			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
 			my $matches = $scriptserver =~ /$scriptsreg/;
 			say
