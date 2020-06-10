@@ -39,6 +39,7 @@ GetOptions(
 	'unfold'      => \$BASECFG{UNFOLD},
 	'fold'        => \$BASECFG{FOLD},
 	'group'       => \$BASECFG{GROUP},
+	'bundle'      => \$BASECFG{BUNDLE},
 	'suit:s'      => \$SUIT,
 	'SEPARATOR:s' => \$BASECFG{SEPARATOR},
 ) or pod2usage( -verbose => 0 );
@@ -333,7 +334,7 @@ for my $arg (@ARGV) {
 				}
 			}
 
-			if ( $CFG{FOLD} || $CFG{GROUP} ) {
+			if ( $CFG{FOLD} || $CFG{GROUP} || $CFG{BUNDLE} ) {
 				$DEFER{ $CFG{RUNSCRIPTFQ} }{ $CFG{RUNSERVERFQ} }++;
 			} else {
 				say "# RUN($arg) $suit:$script on $server" if $CFG{'VERBOSE'};
@@ -351,14 +352,15 @@ for my $arg (@ARGV) {
 
 if (%DEFER) {
 
-	if ( defined $CFG{'GROUP'} ) {
+	if ( $CFG{'GROUP'} ) {
 		for my $script ( keys %DEFER ) {
 			my $str = join $CFG{SEPARATOR}, sort keys %{ $DEFER{$script} };
 			undef $DEFER{$script};
 			$DEFER{$script}{"$str"} = 1;
 		}
 	}
-	if ( defined $CFG{'FOLD'} ) {
+
+	if ( $CFG{'FOLD'} ) {
 		my %FOLD;
 		for my $k ( keys %DEFER ) {
 			for my $v ( keys %{ $DEFER{$k} } ) {
@@ -376,9 +378,48 @@ if (%DEFER) {
 		$CFG{RUNSCRIPTFQ} = $scripts;
 		for my $servers ( sort keys %{ $DEFER{$scripts} } ) {
 			$CFG{RUNSERVERFQ} = $servers;
-			my $script = $scripts;
+
+			if ( $CFG{BUNDLE} ) {
+				if ( index( $scripts, $CFG{SEPARATOR} ) > -1 ) {
+					my $tempfile =
+						( $CFG{RUNSUIT} eq ".." ? '_' : $CFG{RUNSUIT} )
+					  . '#BUNDLESCRIPTS#'
+					  . $CFG{N} . '#'
+					  . $CFG{PID};
+					push @{ $CFG{_CLEANUP} }, ( $CFG{RUNSCRIPTFQ} = $CFG{TEMP} . '/' . $tempfile );
+					say "# BUNDLING SCRIPTS $scripts" if $CFG{VERBOSE};
+					$CFG{RUNSCRIPTSDIR} = $CFG{TEMP};
+					$CFG{RUNSCRIPT}     = $tempfile;
+					open( FOUT, '>', $CFG{RUNSCRIPTFQ} ) or abort("$CFG{RUNSCRIPTFQ}: $!");
+					for my $file ( split /$CFG{SEPARATOR}/, $scripts ) {
+						say "## BUNDLING SCRIPT $file" if $CFG{DEBUG};
+						say FOUT $_ for readfiletoarray($file);
+					}
+					close FOUT;
+				}
+
+				if ( index( $servers, $CFG{SEPARATOR} ) > -1 ) {
+					my $tempfile =
+						( $CFG{RUNSUIT} eq ".." ? '_' : $CFG{RUNSUIT} )
+					  . '#BUNDLESERVERS#'
+					  . $CFG{N} . '#'
+					  . $CFG{PID};
+					push @{ $CFG{_CLEANUP} }, ( $CFG{RUNSERVERFQ} = $CFG{TEMP} . '/' . $tempfile );
+					say "# BUNDLING SERVERS $servers" if $CFG{VERBOSE};
+					$CFG{RUNSERVERSDIR} = $CFG{TEMP};
+					$CFG{RUNSERVER}     = $tempfile;
+					open( FOUT, '>', $CFG{RUNSERVERFQ} ) or abort("$CFG{RUNSERVERFQ}: $!");
+					for my $file ( split /$CFG{SEPARATOR}/, $servers ) {
+						say "## BUNDLING SERVER $file" if $CFG{DEBUG};
+						say FOUT $_ for readfiletoarray($file);
+					}
+					close FOUT;
+				}
+			}
+
+			my $script = $CFG{RUNSCRIPTFQ};
 			$script =~ s{$CFG{RUNSCRIPTSDIR}/}{}g;
-			my $server = $servers;
+			my $server = $CFG{RUNSERVERFQ};
 			$server =~ s{$CFG{RUNSERVERSDIR}/}{}g;
 			$CFG{RUNSCRIPT} = $script;
 			$CFG{RUNSERVER} = $server;
@@ -543,6 +584,7 @@ To create a suits directory structure:
  --unfold     If you have files in your servergroups, recursively read the servers.
  --fold       Group by Scripts
  --group      Group by Servergroups
+ --bundle     Concatenate all scripts/servers if they are folded or grouped, into a new file
  --SEPARATOR  The separation characters between folded and grouped items. (default is double space)
  --suit <suit>  Only consider this suit for all script-server matches
 

@@ -23,6 +23,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --unfold     |If you have files in your servergroups, recursively read the servers.|
 | --fold       |Group by Scripts|
 | --group      |Group by Servergroups|
+| --bundle     |Concatenate all scripts/servers if they are folded or grouped|
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
@@ -309,7 +310,7 @@ Sometimes, the servergroups contain not only the servername/ipaddress on a line,
 
 
 ### FOLD and GROUP
-Sometimes, you need to group the servers or the scripts to reduce the amount of calls you make to ssh. The separator used by default is "  " (two spaces), but you can override it by setting `--SEPARATOR` to another character(s).
+Sometimes, you need to group the servers or the scripts to reduce the amount of calls you make to ssh. The separator used by default is "  " (two spaces), but you can override it by setting `--SEPARATOR` or the shorter `-S` to another character(s). You can also set it in the configuration file as `SEPARATOR=,`
 Caveat: If you use this functionality, please stick to a single suit (you can address multiple scripts/servers in the commandline, as long as their directories are the same).
 
 To see what it would do with your scripts and servers, use `--dryrun` and `--verbose` in combination with `--fold` and `--group`. and grep on the word 'RUN'
@@ -365,6 +366,11 @@ You can combine `--fold` and `--group` on the commandline, and that would RUN li
 |---|---|
 |test1=VM+ test3=VM+|VM-ET VM-PR|
 |test2=VM-ET |VM-ET|
+
+### BUNDLE
+Now you have bundled or folded and will run less `RUN=` commands, but you still have the same amount of files to process. You can additionally `--bundle` (`-b`) these into a single file. Bundling will only be done if there are multiple files.
+
+
 
 ## I don't like perl
 
