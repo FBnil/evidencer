@@ -34,7 +34,7 @@ GetOptions(
 	'verbose|v'     => \$BASECFG{VERBOSE},
 	'dryrun|d'      => \$BASECFG{DRYRUN},
 	'UTC|U'         => \$BASECFG{UTC},
-	'CREATEDIRS'    => \$BASECFG{CREATEDIRS},
+	'CREATEDIRS|C'  => \$BASECFG{CREATEDIRS},
 	'keep|k'        => \$BASECFG{KEEP},
 	'noautofix|n'   => \$BASECFG{NOAUTOFIX},
 	'unfold|u'      => \$BASECFG{UNFOLD},
@@ -604,7 +604,7 @@ To create a suits directory structure:
  --fold       Group by Scripts
  --group      Group by Servergroups
  --bundle     Concatenate all scripts/servers if they are folded or grouped, into a new file
- --redefine   Override a variable that ought to be in the evidencer.cfg (can be used multiple times)
+ --redefine   Override a variable from evidencer.cfg (can be used multiple times)
  --SEPARATOR  The separation characters between folded and grouped items. (default is double space)
  --suit <suit>  Only consider this suit for all script-server matches
 
