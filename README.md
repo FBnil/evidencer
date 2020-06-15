@@ -27,6 +27,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
+options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
 ## Directories
 
@@ -45,7 +46,7 @@ servers/APACHE-WEBSERVERS-PROD
 servers/APACHE-WEBSERVERS-PROD-DMZ
 servers/NGINX-WEBSERVERS-PROD-DMZ
 ```
-You write scripts that target each one of them. For example, `test1=+` will match all the `APACHE-WEBSERVERS-*` servergroups
+You write scripts that target each one of them. For example, `test1=APACHE-WEBSERVERS++` will match all the `APACHE-WEBSERVERS-*` servergroups
 But `test2=APACHE-WEBSERVERS-ACCP` will only match the servergroup `APACHE-WEBSERVERS-ACCP`.
 ```sh
 $ find scripts/ -type f |sort
@@ -134,10 +135,10 @@ Say we want to run, from the suit `JAVATRANSACTIONS` the test `JAVASERVER-SERVIC
  ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
  ```
  
- show (dryrun) what would run from the suit `JAVATRANSACTIONS` the test 
+ show (--dryrun) what would run from the suit `JAVATRANSACTIONS` the test (dryrun is not that useful without --verbose)
  `JAVASERVER-SERVICES=` for any matching servers AND the test `JAVASERVER-PORTS` for any of it's matching servers
  ```sh
- ./evidencer -s JAVATRANSACTIONS JAVASERVER-SERVICES=* JAVASERVER-PORTS -d
+ ./evidencer -s JAVATRANSACTIONS JAVASERVER-SERVICES=* JAVASERVER-PORTS -dv
  ```
 
  `JAVASERVER-SERVICES=*` can be written as:
