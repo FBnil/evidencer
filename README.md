@@ -24,6 +24,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --fold       |Group by Scripts|
 | --group      |Group by Servergroups|
 | --bundle     |Concatenate all scripts/servers if they are folded or grouped|
+| --redefine   |Override a variable that ought to be in the evidencer.cfg (can be used multiple times)|
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
@@ -371,6 +372,43 @@ You can combine `--fold` and `--group` on the commandline, and that would RUN li
 ### BUNDLE
 Now you have bundled or folded and will run less `RUN=` commands, but you still have the same amount of files to process. You can additionally `--bundle` (`-b`) these into a single file. Bundling will only be done if there are multiple files.
 
+
+### REDEFINE
+
+If you have an evidencer.cfg that looks like this:
+```sh
+ALIAS PARALLEL=RUN=%{PARALLEL_RUN}
+PARALLEL_RUN=./bin/ssh-batch --bg-log-dir %{RUNRESULTSDIR} %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}-parallel.log
+RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
+```
+
+We can replace the `RUN` variable with another value:
+```./evidencer test1 -r 'RUN=%{PARALLEL_RUN}'```
+or we can make use of an ALIAS to do the same:
+```./evidencer test1 -r PARALLEL```
+
+and the normal RUN parameter will be replaced by the parallel form of `ssh-batch`.
+
+Keep it mind to not clash with substrings with boundaries in your script names. So do not create a script called `PARALLEL=+`, nor `PARALLEL-CHECK=+`, but `parallel=+` and `PARALLELS=+` are ok.
+
+
+### REDEFINE
+
+If you have an evidencer.cfg that looks like this:
+```sh
+ALIAS PARALLEL=RUN=%{PARALLEL_RUN}
+PARALLEL_RUN=./bin/ssh-batch --bg-log-dir %{RUNRESULTSDIR} %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}-parallel.log
+RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
+```
+
+We can replace the `RUN` variable with another value:
+```./evidencer test1 -r 'RUN=%{PARALLEL_RUN}'```
+or we can make use of an ALIAS to do the same:
+```./evidencer test1 -r PARALLEL```
+
+and the normal RUN parameter will be replaced by the parallel form of `ssh-batch`.
+
+Keep it mind to not clash with substrings with boundaries in your script names. So do not create a script called `PARALLEL=+`, nor `PARALLEL-CHECK=+`, but `parallel=+` and `PARALLELS=+` are ok.
 
 
 ## I don't like perl

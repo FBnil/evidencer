@@ -41,6 +41,7 @@ GetOptions(
 	'fold|f'        => \$BASECFG{FOLD},
 	'group|g'       => \$BASECFG{GROUP},
 	'bundle|b'      => \$BASECFG{BUNDLE},
+	'redefine|r=s@' => \$BASECFG{REDEFINE},
 	'suit|s:s'      => \$SUIT,
 	'SEPARATOR|S:s' => \$BASECFG{SEPARATOR},
 ) or pod2usage( -verbose => 0 );
@@ -106,6 +107,23 @@ sub readCFG
 				$v = abs_path($v) if $DIRS{$k};
 				$CFG{$k} = $v unless $DONOTOVERRIDE{$k} && defined $CFG{$k};
 			}
+		}
+	}
+	for my $k (qw(SUIT)) {
+		$CFG{$k} = $ENV{$k} if defined $ENV{$k};
+	}
+	if ( $CFG{REDEFINE} ) {
+		for my $redef ( @{ $CFG{REDEFINE} } ) {
+			if ( index( $redef, "=" ) == -1 ) {
+				print "redef $redef for $_" for keys %{ $CFG{'ALIAS'} };
+				$redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+			}
+			@_ = split "=", $redef, 2;
+			say "redef=($redef)";
+			if ( index( $_[1], "%{" ) > -1 ) {
+				xexpand( $_[1], '%\{(\w+)\}', \%CFG );
+			}
+			$CFG{ $_[0] } = $_[1];
 		}
 	}
 }
@@ -586,8 +604,11 @@ To create a suits directory structure:
  --fold       Group by Scripts
  --group      Group by Servergroups
  --bundle     Concatenate all scripts/servers if they are folded or grouped, into a new file
+ --redefine   Override a variable that ought to be in the evidencer.cfg (can be used multiple times)
  --SEPARATOR  The separation characters between folded and grouped items. (default is double space)
  --suit <suit>  Only consider this suit for all script-server matches
+
+Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
  Example:
  
