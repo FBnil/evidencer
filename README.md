@@ -24,7 +24,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --fold       |Group by Scripts|
 | --group      |Group by Servergroups|
 | --bundle     |Concatenate all scripts/servers if they are folded or grouped|
-| --redefine   |Override a variable that ought to be in the evidencer.cfg (can be used multiple times)|
+| --redefine   |Override a variable from evidencer.cfg (can be used multiple times)|
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
