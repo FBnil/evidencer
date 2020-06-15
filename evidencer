@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case);
+Getopt::Long::Configure("bundling");
 use Pod::Usage;
 use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd 'abs_path';
@@ -26,22 +27,22 @@ my %opt;
 my ( $opt_help, $opt_man );
 
 GetOptions(
-	'help!'       => \$opt_help,
-	'man!'        => \$opt_man,
-	'config=s'    => \$CFGFILE,
-	'DEBUG'       => \$BASECFG{DEBUG},
-	'verbose'     => \$BASECFG{VERBOSE},
-	'dryrun'      => \$BASECFG{DRYRUN},
-	'UTC'         => \$BASECFG{UTC},
-	'CREATEDIRS'  => \$BASECFG{CREATEDIRS},
-	'keep'        => \$BASECFG{KEEP},
-	'noautofix'   => \$BASECFG{NOAUTOFIX},
-	'unfold'      => \$BASECFG{UNFOLD},
-	'fold'        => \$BASECFG{FOLD},
-	'group'       => \$BASECFG{GROUP},
-	'bundle'      => \$BASECFG{BUNDLE},
-	'suit:s'      => \$SUIT,
-	'SEPARATOR:s' => \$BASECFG{SEPARATOR},
+	'help!'         => \$opt_help,
+	'man!'          => \$opt_man,
+	'config|c=s'    => \$CFGFILE,
+	'DEBUG|D'       => \$BASECFG{DEBUG},
+	'verbose|v'     => \$BASECFG{VERBOSE},
+	'dryrun|d'      => \$BASECFG{DRYRUN},
+	'UTC|U'         => \$BASECFG{UTC},
+	'CREATEDIRS'    => \$BASECFG{CREATEDIRS},
+	'keep|k'        => \$BASECFG{KEEP},
+	'noautofix|n'   => \$BASECFG{NOAUTOFIX},
+	'unfold|u'      => \$BASECFG{UNFOLD},
+	'fold|f'        => \$BASECFG{FOLD},
+	'group|g'       => \$BASECFG{GROUP},
+	'bundle|b'      => \$BASECFG{BUNDLE},
+	'suit|s:s'      => \$SUIT,
+	'SEPARATOR|S:s' => \$BASECFG{SEPARATOR},
 ) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
