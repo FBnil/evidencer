@@ -98,7 +98,7 @@ sub readCFG
 			next if /^#/ || !/=/;
 			chomp;
 			s/\s+$//;
-			if (/^ALIAS\s+(\S+)=(.*)/) {
+			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/) {
 				$CFG{'ALIAS'}{$1} = $2;
 			} else {
 				my ( $k, $v ) = split '=', $_, 2;
