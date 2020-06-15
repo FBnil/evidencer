@@ -27,7 +27,7 @@ my %opt;
 my ( $opt_help, $opt_man );
 
 GetOptions(
-	'help!'         => \$opt_help,
+	'help|h!'       => \$opt_help,
 	'man!'          => \$opt_man,
 	'config|c=s'    => \$CFGFILE,
 	'DEBUG|D'       => \$BASECFG{DEBUG},
@@ -115,11 +115,10 @@ sub readCFG
 	if ( $CFG{REDEFINE} ) {
 		for my $redef ( @{ $CFG{REDEFINE} } ) {
 			if ( index( $redef, "=" ) == -1 ) {
-				print "redef $redef for $_" for keys %{ $CFG{'ALIAS'} };
 				$redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 			}
 			@_ = split "=", $redef, 2;
-			say "redef=($redef)";
+			say "# redef=($redef)" if $CFG{'DEBUG'};
 			if ( index( $_[1], "%{" ) > -1 ) {
 				xexpand( $_[1], '%\{(\w+)\}', \%CFG );
 			}
@@ -322,7 +321,9 @@ for my $arg (@ARGV) {
 					++$counter;
 					for my $regexp ( @{ $SCRIPT_FILES{$suitscript}{'!'} } ) {
 						say "looking if $_ matches $regexp" if $CFG{'DEBUG'};
-						if ( $regexp =~ /^#(\d+)/ ? $counter == $1 : m/$regexp/ix ) {
+						if ( $regexp =~ /^#(\-?\d+)/
+							? ( $1 > 0 ? $counter == $1 : $#read_servers + 2 == -$1 )
+							: m/$regexp/ix ) {
 							s/\s+.*//;
 							push @servers, $_;
 							last;
