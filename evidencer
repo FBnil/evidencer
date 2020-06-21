@@ -20,11 +20,21 @@ my %BASECFG = (
 	UTC       => 0,
 	NEWLINE   => "\n",
 	SEPARATOR => "  ",
+	ARG       => "",
 );
 my $SUIT = $ENV{'SUIT'} || "";
 
 my %opt;
 my ( $opt_help, $opt_man );
+
+# Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
+if ( grep /^\-\-$/, @ARGV ) {
+	@_ = ();
+	while ( ( $_ = pop @ARGV ) ne '--' ) {
+		unshift @_, $_;
+	}
+	$BASECFG{ARG} = join " ", @_;
+}
 
 GetOptions(
 	'help|h!'       => \$opt_help,
@@ -44,6 +54,7 @@ GetOptions(
 	'redefine|r=s@' => \$BASECFG{REDEFINE},
 	'suit|s:s'      => \$SUIT,
 	'SEPARATOR|S:s' => \$BASECFG{SEPARATOR},
+	'argument|a:s' => \$BASECFG{ARG},
 ) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
@@ -158,18 +169,18 @@ pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR
 runit('RUN_BEGIN');
 
 # Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
-for my $arg (@ARGV) {
+for my $argv (@ARGV) {
 	my %SCRIPT_FILES;
 	my @REG_SCRIPTS;
 	my @REG_SERVERS;
-	say "Processing ARG: $arg" if $CFG{'VERBOSE'};
+	say "Processing ARG: $argv" if $CFG{'VERBOSE'};
 	my ( $suit, $scripts ) =
-	  index( $arg, ':' ) > -1 ? split( ':', $arg, 2 ) : ( $SUIT || $CFG{'SUIT'}, $arg );
+	  index( $argv, ':' ) > -1 ? split( ':', $argv, 2 ) : ( $SUIT || $CFG{'SUIT'}, $argv );
 	readCFG( $CFGFILE, $suit ) if ( $CFG{'_SELECTED_SUIT'} ne $suit );
-	my $hoststr;
-	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $arg, '@' ) > -1;
+	my $hoststr = "";
+	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $argv, '@' ) > -1;
 	$hoststr = '.' if $CFG{'UNFOLD'} && !$hoststr;
-	$CFG{'ARG'} = $arg;
+	$CFG{'ARGV'} = $argv;
 
 	# make a proper scripts (add =* if not there)
 	$scripts .= '=' unless index( $scripts, '=' ) > -1;
@@ -208,7 +219,7 @@ for my $arg (@ARGV) {
 		my ( $reg_script, $reg_server ) = split "=", $script, 2;
 		next unless $reg_server;    # skip files that do not have servergroup candidates
 		globlize($reg_server);
-		say "For $script, search for servers: $reg_server in $serversdir arg:($arg)"
+		say "For $script, search for servers: $reg_server in $serversdir argv:($argv)"
 		  if $CFG{'DEBUG'};
 		push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
 		warn "Nothing found for $CFG{'SERVERS'}/$reg_server\n" unless @REG_SERVERS;
@@ -223,7 +234,7 @@ for my $arg (@ARGV) {
 			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
 			my $matches = $scriptserver =~ /$scriptsreg/;
 			say
-"check FIT arg: $arg script: $script scripts:$scripts\n scriptsreg: $scriptsreg scriptserver: $scriptserver\n"
+"check FIT argv: $argv script: $script scripts:$scripts\n scriptsreg: $scriptsreg scriptserver: $scriptserver\n"
 			  . " server=$server  $scriptserver =~/ $scriptsreg / matches=$matches"
 			  if $CFG{'DEBUG'};
 			++$SCRIPT_FILES{ $suit . ':' . $script }{ $suit . ':' . $server } if $matches;
@@ -357,14 +368,7 @@ for my $arg (@ARGV) {
 			if ( $CFG{FOLD} || $CFG{GROUP} || $CFG{BUNDLE} ) {
 				$DEFER{ $CFG{RUNSCRIPTFQ} }{ $CFG{RUNSERVERFQ} }++;
 			} else {
-				say "# RUN($arg) $suit:$script on $server" if $CFG{'VERBOSE'};
-				say "# SCRIPT=$CFG{RUNSCRIPTFQ}"           if $CFG{'VERBOSE'};
-				say "# SERVER=$CFG{RUNSERVERFQ}"           if $CFG{'VERBOSE'};
-				$CFG{N} = $BASECFG{N} +=
-				  1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
-				for my $run (qw(RUN_PRE RUN RUN_POST)) {
-					runit( $run, !$run =~ /PRE/ );    # update time only for RUN_PRE
-				}
+				&executerun();
 			}
 		}
 	}
@@ -438,24 +442,12 @@ if (%DEFER) {
 			}
 
 			my $script = $CFG{RUNSCRIPTFQ};
-			$script =~ s{$CFG{RUNSCRIPTSDIR}/}{}g;
 			my $server = $CFG{RUNSERVERFQ};
+			$script =~ s{$CFG{RUNSCRIPTSDIR}/}{}g;
 			$server =~ s{$CFG{RUNSERVERSDIR}/}{}g;
 			$CFG{RUNSCRIPT} = $script;
 			$CFG{RUNSERVER} = $server;
-			if ( $CFG{'VERBOSE'} ) {
-				my $arg  = $CFG{'ARG'};
-				my $suit = $CFG{RUNSUIT};
-				say "# RUN($arg) $suit: ($script) on ($server)";
-				say "# SCRIPT=$CFG{RUNSCRIPTFQ}";
-				say "# SERVER=$CFG{RUNSERVERFQ}";
-			}
-			$CFG{N} = $BASECFG{N} += 1;
-			my $EC;
-			for my $run (qw(RUN_PRE RUN RUN_POST)) {
-				$EC = runit( $run, $run ne "RUN_PRE" );    # update time only for RUN_PRE
-				last if ( $EC && $run eq "RUN_PRE" );
-			}
+			&executerun();
 		}
 	}
 }
@@ -470,6 +462,37 @@ if ( !$CFG{'KEEP'} ) {
 runit('RUN_FINISH') if $BASECFG{RUN_STARTED};
 runit('RUN_END');
 exit 0;
+
+sub executerun
+{
+	if ( $CFG{ARG} ) {
+		if ( ref $CFG{ARG} eq "ARRAY" ) {
+			$CFG{ARG} = join " ", @{ $CFG{ARG} };
+		}
+	}
+	if ( $CFG{'VERBOSE'} ) {
+		say "# RUN($CFG{'ARGV'}) $CFG{RUNSUIT}:$CFG{RUNSCRIPT} on $CFG{RUNSERVER}"
+		  . ( $CFG{ARG} ? " with argument '$CFG{ARG}'" : "" );
+		say "# SCRIPT=$CFG{RUNSCRIPTFQ}";
+		say "# SERVER=$CFG{RUNSERVERFQ}";
+	}
+	$CFG{N} = $BASECFG{N} += 1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
+	my $EC;
+	my $REDO = defined $CFG{'REDO'} ? $CFG{'REDO'} : 0;
+	for my $run (qw(RUN_PRE RUN RUN_POST)) {
+	  REDO:
+		if ( $CFG{'ARG'} && defined $CFG{ $run . "_ARG" } ) {
+			$EC = runit( $run . "_ARG", $run ne "RUN_PRE" );    # update time only for RUN_PRE
+		} else {
+			$EC = runit( $run, $run ne "RUN_PRE" );             # update time only for RUN_PRE
+		}
+		if ( $EC && $REDO > 0 && $run eq "RUN" ) {
+			--$REDO;
+			goto REDO;
+		}
+		last if ( $EC && $run eq "RUN_PRE" );
+	}
+}
 
 # allow executing ABORTMSG before die (usually from lacking permissions to read/write files)
 sub abort
@@ -606,6 +629,7 @@ To create a suits directory structure:
  --group      Group by Servergroups
  --bundle     Concatenate all scripts/servers if they are folded or grouped, into a new file
  --redefine   Override a variable from evidencer.cfg (can be used multiple times)
+ --argument   Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
  --SEPARATOR  The separation characters between folded and grouped items. (default is double space)
  --suit <suit>  Only consider this suit for all script-server matches
 

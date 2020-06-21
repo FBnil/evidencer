@@ -25,6 +25,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --group      |Group by Servergroups|
 | --bundle     |Concatenate all scripts/servers if they are folded or grouped|
 | --redefine   |Override a variable from evidencer.cfg (can be used multiple times)|
+| --argument   |Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined) See --|
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
@@ -213,6 +214,8 @@ All variables that have to do with running found combinations of servers and scr
 | RUN Variable | What it does|
 |----|---|
 |PID|The process ID of the currently running evidencer use it as: `%{PID}`. Combine with `%{N}` for unique filenames|
+|ARGV|The script+server combination we are running|
+|ARG|Contains the string with the argument(s) passed with `--` or a single argument passed with `-a`|
 |N|A number that increases just before you use the: `RUN_PRE`, `RUN` and `RUN_POST`. Use it like: `%{N}`|
 |RUNSCRIPTSDIR|The directory where the scripts are located, basically: `%{SUITDIR}`/`%{SUIT}`/`%{SCRIPTS}`|
 |RUNSERVERSDIR|The directory where the servergroups are located, basically: `%{SUITDIR}`/`%{SUIT}`/`%{SERVERS}`|
@@ -236,6 +239,8 @@ All variables that have to do with running found combinations of servers and scr
 All `RUN*` commands have a `*_FAIL` counterpart. If the exitcode of the command is nonzero, then the `*_FAIL` will be run.
 The `RUN_PRE` is a special case, when RUN_PRE returns with a nonzero exitcode, then RUN_PRE_FAIL will run, and then `RUN` and `RUN_POST` will be skipped. To override this, end your command with `;true`.
 
+If you use arguments (either by adding one argument with `-a` or using `--` at the end of the parameters, and adding your parameters after it; then, if you have defined:
+`RUN_PRE_ARG`, `RUN_ARG`, `RUN_POST_ARG` Then those commands will be used instead. In both cases, `%{ARG}` will be available to be used. 
 
 #### example
 
