@@ -122,12 +122,16 @@ subtest 'redefine' => sub {
   like($_[1], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ run /.*/BUILDTEST/scripts/TEST2=\+\+ET!, 'alternative1b');
 };
 
-subtest 'argument' => sub {
-  plan tests => 1;
+subtest 'argument1' => sub {
+  plan tests => 2;
   @_ = `$exe -s BUILDTEST TEST2=++ET\@svr1et -d -v -r ALTERNATIVE1 -- --fantastic 4 |grep ^echo`;
   say @_;
   like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument --fantastic 4!, 'argument1a');
+  @_ = `$exe -s BUILDTEST TEST2=++ET\@svr1et -d -v -r ALTERNATIVE1 -a incredible |grep ^echo`;
+  say @_;
+  like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument incredible!, 'argument2a');
 };
+
 
 
 done_testing();
