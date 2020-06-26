@@ -207,6 +207,9 @@ for my $argv (@ARGV) {
 
 	# If we are using +, transform it to something glob can use to find servers
 	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
+	readCFG($_)
+	  if ( ( !$SUIT || index( $argv, ':' ) > -1 )
+		&& -f ( $_ = "$CFG{SUITDIR}/$suit/$reg_scripts.cfg" ) );
 	globlize($reg_servers);
 
 	# Give me all scripts that match the scripts name, independant of servers
