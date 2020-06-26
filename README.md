@@ -124,10 +124,21 @@ To create a suits directory structure:
 ```
 After moving your files you can run all tests from the `TEST_SUIT_NAME` like this:
 ```sh
-# ./evidencer -s TEST_SUIT_NAME =
+./evidencer -s TEST_SUIT_NAME =
 ```
 
 Optionally, you can add a `./suits/TEST_SUIT_NAME/evidencer.cfg` configuration file, and override settings only for that suit. Very handy for ALIAS entries to not polute other SUIT's.
+And you can create a `./suits/TEST_SUIT_NAME/TEST_NAME.cfg` to even override parts of that configuration. It will not always be activated, to activate it, use this syntax:
+```sh
+./evidencer TEST_SUIT_NAME:TESTNAME=
+./evidencer -s TEST_SUIT_NAME  TEST_SUIT_NAME:TESTNAME=  OTHER_TEST_IN_SAME_SUIT=
+```
+Because it will use the `./suits/TEST_SUIT_NAME/evidencer.cfg` or `/dir/otherconfig.cfg` you use:
+```sh
+./evidencer -s TEST_SUIT_NAME TESTNAME=
+./evidencer -c /dir/otherconfig.cfg -s TEST_SUIT_NAME TESTNAME=
+```
+
 
 
 ### more examples
