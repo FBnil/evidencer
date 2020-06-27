@@ -21,6 +21,7 @@ my %BASECFG = (
 	NEWLINE   => "\n",
 	SEPARATOR => "  ",
 	ARG       => "",
+	QUOTESTR  => "'"
 );
 my $SUIT = $ENV{'SUIT'} || "";
 
@@ -54,7 +55,8 @@ GetOptions(
 	'redefine|r=s@' => \$BASECFG{REDEFINE},
 	'suit|s:s'      => \$SUIT,
 	'SEPARATOR|S:s' => \$BASECFG{SEPARATOR},
-	'argument|a:s' => \$BASECFG{ARG},
+	'argument|a:s'  => \$BASECFG{ARG},
+	'quote|q'       => \$BASECFG{QUOTE},
 ) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
@@ -368,6 +370,14 @@ for my $argv (@ARGV) {
 				}
 			}
 
+			# enquote
+			if ( $CFG{QUOTE} ) {
+				for my $fq (qw(RUNSCRIPTFQ RUNSERVERFQ)) {
+					$CFG{$fq} =~ s/($CFG{QUOTESTR})/\\$1/g;
+					$CFG{$fq} = $CFG{QUOTESTR} . $CFG{$fq} . $CFG{QUOTESTR};
+				}
+			}
+
 			if ( $CFG{FOLD} || $CFG{GROUP} || $CFG{BUNDLE} ) {
 				$DEFER{ $CFG{RUNSCRIPTFQ} }{ $CFG{RUNSERVERFQ} }++;
 			} else {
@@ -396,7 +406,7 @@ if (%DEFER) {
 		}
 		%DEFER = ();
 		for my $k ( keys %FOLD ) {
-			my $str = join "$CFG{SEPARATOR}", sort keys %{ $FOLD{$k} };
+			my $str = join $CFG{SEPARATOR}, sort keys %{ $FOLD{$k} };
 			$DEFER{$str}{$k} = 1;
 		}
 	}
@@ -633,6 +643,7 @@ To create a suits directory structure:
  --bundle     Concatenate all scripts/servers if they are folded or grouped, into a new file
  --redefine   Override a variable from evidencer.cfg (can be used multiple times)
  --argument   Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
+ --quote      Quote your scripts and servers using %{QUOTESTR}. Handy for fold and group.
  --SEPARATOR  The separation characters between folded and grouped items. (default is double space)
  --suit <suit>  Only consider this suit for all script-server matches
 

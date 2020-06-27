@@ -24,8 +24,9 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --fold       |Group by Scripts|
 | --group      |Group by Servergroups|
 | --bundle     |Concatenate all scripts/servers if they are folded or grouped|
-| --redefine   |Override a variable from evidencer.cfg (can be used multiple times)|
-| --argument   |Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined) See --|
+| --redefine <>|Override a variable from evidencer.cfg (can be used multiple times)|
+| --argument <>|Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined) See --|
+| --quote      |Quote all scripts and servers files|
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
 | --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
@@ -426,6 +427,27 @@ and the normal RUN parameter will be replaced by the parallel form of `ssh-batch
 
 Keep it mind to not clash with substrings with boundaries in your script names. So do not create a script called `PARALLEL=+`, nor `PARALLEL-CHECK=+`, but `parallel=+` and `PARALLELS=+` are ok.
 
+You can also disable/enable settings, for example if folding is enabled in the CFG `FOLD=1`, then you can disabled it from the commandline:
+```
+./evidencer -r FOLD=0 ...
+```
+
+### QUOTE
+If you have a path with spaces, it is useful to quote them before using them, to do this, use `--quote` The default is a single quote. You can override this by setting `QUOTESTR`. Note that setting the `QUOTESTR` will not automatically enabled quoting. 
+You can override it in the CFG:
+```
+QUOTESTR='
+```
+or through the commandline:
+```
+./evidencer -q -r QUOTESTR="'" ...
+```
+
+To permanently activate quoting, use the CFG:
+```
+QUOTE=1
+```
+Or set to zero if you do not want quoting (the default, but it could be enabled if you inherit the setting).
 
 ## I don't like perl
 
