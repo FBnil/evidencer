@@ -57,6 +57,7 @@ GetOptions(
 	'SEPARATOR|S:s' => \$BASECFG{SEPARATOR},
 	'argument|a:s'  => \$BASECFG{ARG},
 	'quote|q'       => \$BASECFG{QUOTE},
+	'test|t:s'      => \$BASECFG{TEST},
 ) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
@@ -492,7 +493,8 @@ sub executerun
 	$CFG{N} = $BASECFG{N} += 1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
 	my $EC;
 	my $REDO = defined $CFG{'REDO'} ? $CFG{'REDO'} : 0;
-	for my $run (qw(RUN_PRE RUN RUN_POST)) {
+	for my $run ( glob "{RUN}{_PRE,,_POST}{_TEST,}" ) {
+		next if $run =~ /_TEST$/ && !defined $CFG{'TEST'};
 	  REDO:
 		if ( $CFG{'ARG'} && defined $CFG{ $run . "_ARG" } ) {
 			$EC = runit( $run . "_ARG", $run ne "RUN_PRE" );    # update time only for RUN_PRE
@@ -503,7 +505,7 @@ sub executerun
 			--$REDO;
 			goto REDO;
 		}
-		last if ( $EC && $run eq "RUN_PRE" );
+		last if ( $EC && $run =~ /_TEST|RUN_PRE/ );
 	}
 }
 
@@ -641,10 +643,11 @@ To create a suits directory structure:
  --fold       Group by Scripts
  --group      Group by Servergroups
  --bundle     Concatenate all scripts/servers if they are folded or grouped, into a new file
- --redefine   Override a variable from evidencer.cfg (can be used multiple times)
- --argument   Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
+ --redefine $ Override a variable from evidencer.cfg (can be used multiple times)
+ --argument $ Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
  --quote      Quote your scripts and servers using %{QUOTESTR}. Handy for fold and group.
- --SEPARATOR  The separation characters between folded and grouped items. (default is double space)
+ --SEPARATOR $ The separation characters between folded and grouped items. (default is double space)
+ --test $     Final test against a RUN (either before or after RUN_PRE) to validate the combination
  --suit <suit>  Only consider this suit for all script-server matches
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.

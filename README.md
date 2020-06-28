@@ -28,6 +28,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | --argument <>|Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined) See --|
 | --quote      |Quote all scripts and servers files|
 | --SEPARATOR  |The separation characters between folded and grouped items. (default is double space)|
+| --test <arg> | Final test against a RUN (either before or after RUN_PRE) to validate the combination|
 | --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
@@ -237,7 +238,10 @@ All variables that have to do with running found combinations of servers and scr
 |RUNSCRIPTFQ|Fully Qualified name for the scripts file, basically: `%{RUNSCRIPTSDIR}`/`%{RUNSCRIPT}`|
 |RUNSERVERFQ|Fully Qualified name for the servers file, basically: `%{RUNSERVERSDIR}`/`%{RUNSERVER}`|
 |RUNNAME|The name of the scripts file being processed %{RUNSCRIPT}, but stripped of the `=` and everything to the right|
-|RUN_PRE|Execute this string in the shell. Runs before `RUN`. Time date strings are set before RUN_PRE and are the same for RUN and RUN_POST even if they take time to execute.|
+|TEST|Argument string given with --test on the commandline. It can be used in your `RUN_PRE_TEST` or `RUN_TEST`, which only activate when --test is used|
+|RUN_PRE_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip before `RUN_PRE` |
+|RUN_PRE|Execute this string in the shell. Runs before `RUN`. Time date strings are set before `RUN_PRE` and are the same for `RUN` and `RUN_POST` even if they take time to execute. Exit nonzero to skip.|
+|RUN_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip `RUN` (but `RUN_PRE` already ran if it was defined)|
 |RUN|Execute this string in the shell|
 |RUN_POST|Execute this string in the shell. Runs after `RUN`|
 |KEEP|Set to true(1) to keep temporal files created when @hostnames is used|
@@ -252,7 +256,7 @@ All `RUN*` commands have a `*_FAIL` counterpart. If the exitcode of the command 
 The `RUN_PRE` is a special case, when RUN_PRE returns with a nonzero exitcode, then RUN_PRE_FAIL will run, and then `RUN` and `RUN_POST` will be skipped. To override this, end your command with `;true`.
 
 If you use arguments (either by adding one argument with `-a` or using `--` at the end of the parameters, and adding your parameters after it; then, if you have defined:
-`RUN_PRE_ARG`, `RUN_ARG`, `RUN_POST_ARG` Then those commands will be used instead. In both cases, `%{ARG}` will be available to be used. 
+`RUN_PRE_TEST_ARG`, `RUN_PRE_ARG`, `RUN_TEST_ARG`, `RUN_ARG`, `RUN_POST_TEST_ARG`, `RUN_POST_ARG` Then those commands will be used instead. In both cases, `%{ARG}` will be available to be used. 
 
 #### example
 
