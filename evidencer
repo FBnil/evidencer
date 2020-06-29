@@ -189,8 +189,12 @@ for my $argv (@ARGV) {
 	$hoststr = '.' if $CFG{'UNFOLD'} && !$hoststr;
 	$CFG{'ARGV'} = $argv;
 
-	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 	$suit    =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+	if ( index( $scripts, ' ' ) > -1 ) {
+		push @ARGV, map { /:/ ? $_ : "$suit:$_" } split / +/, $scripts;
+		next;
+	}
 
 	# make a proper scripts (add =* if not there)
 	$scripts .= '=' unless index( $scripts, '=' ) > -1;
