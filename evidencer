@@ -38,7 +38,7 @@ if ( grep /^\-\-$/, @ARGV ) {
 }
 
 GetOptions(
-	'help|h!'       => \$opt_help,
+	'help|h|?!'     => \$opt_help,
 	'man!'          => \$opt_man,
 	'config|c=s'    => \$CFGFILE,
 	'DEBUG|D'       => \$BASECFG{DEBUG},
@@ -129,6 +129,10 @@ sub readCFG
 	if ( $CFG{REDEFINE} ) {
 		for my $redef ( @{ $CFG{REDEFINE} } ) {
 			if ( index( $redef, "=" ) == -1 ) {
+				if ( index( $redef, "," ) > -1 ) {
+					push @{ $CFG{REDEFINE} }, split /,/, $redef;
+					next;
+				}
 				$redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 			}
 			@_ = split "=", $redef, 2;
@@ -185,12 +189,13 @@ for my $argv (@ARGV) {
 	$hoststr = '.' if $CFG{'UNFOLD'} && !$hoststr;
 	$CFG{'ARGV'} = $argv;
 
+	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+	$suit    =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+
 	# make a proper scripts (add =* if not there)
 	$scripts .= '=' unless index( $scripts, '=' ) > -1;
 	$scripts =~ s/=$/=*/;
 	$scripts =~ s/^=/*=/;
-	$scripts =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
-	$suit    =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 
 # allow for ALIASes to have %{} variables, and be expanded inside $scripts (but why did you use variables?).
 	if ( index( $scripts, "%{" ) > -1 ) {
