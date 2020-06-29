@@ -116,6 +116,30 @@ Find all that is runnable for host001, and run it.
 ```
 Run `test2` on host001 (only if any test2=* matches a servergroup that contains that server)
 
+### ALIAS
+
+Aliases have 3 usages. The first is to help expanding shortcuts inside a `scripts=server` argument, on both sides of the `=`, as seen in the `ALIAS HTTPD=APACHE-WEBSERVERS` example above. 
+The second is to expand a complete evidencing set. For example, with this cfg file:
+```
+ALIAS SetTestA=test1=VM-PR test2=VM-ET
+```
+We can run:
+```
+./evidencer SetTestA
+```
+and it will expand to:
+```
+./evidencer ..:test1=VM-PR ..:test2=VM-ET
+```
+(The `..` as suit means that it's not in a suit, but at the top level)
+which would be the same as running it from the commandline:
+```
+./evidencer test1=VM-PR test2=VM-ET
+```
+Note: ALIASes are case sensitive. Consider using `%`, `~` or `/` as the first character of these type of aliases to prevent naming clashes.
+
+And the third usage of `ALIAS` is for `--redefine`, which has it's own chapter on how to use it.
+
 ## SUITS
 once you are done with the tests, or you have multiple tests, and do not want to overlap things, move your `./servers/*` and `./scripts/*` into a subdirectory
 called `./suit/TEST_SUIT_NAME/servers/`  and `./suit/TEST_SUIT_NAME/scripts/`
@@ -409,6 +433,7 @@ or we can make use of an ALIAS to do the same:
 ```./evidencer test1 -r PARALLEL```
 
 and the normal RUN parameter will be replaced by the parallel form of `ssh-batch`.
+While only using aliases (no `=` sign in the `-r`), you can use a comma to add more expressions.
 
 Keep it mind to not clash with substrings with boundaries in your script names. So do not create a script called `PARALLEL=+`, nor `PARALLEL-CHECK=+`, but `parallel=+` and `PARALLELS=+` are ok.
 
