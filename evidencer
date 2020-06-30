@@ -8,8 +8,6 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd 'abs_path';
 use feature 'say';
 
-#use lib (dirname abs_path $0) . '/lib';
-
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my %RICH;     # for forcing a new servergroup file
@@ -391,6 +389,7 @@ for my $argv (@ARGV) {
 			if ( $CFG{FOLD} || $CFG{GROUP} || $CFG{BUNDLE} ) {
 				$DEFER{ $CFG{RUNSCRIPTFQ} }{ $CFG{RUNSERVERFQ} }++;
 			} else {
+				$CFG{RUNNAMES} = $CFG{RUNNAME};
 				&executerun();
 			}
 		}
@@ -420,6 +419,8 @@ if (%DEFER) {
 			$DEFER{$str}{$k} = 1;
 		}
 	}
+
+	$CFG{RUNNAMES} = join '+', grep { s{.*/}{}; s{=.*}{}; } sort keys %DEFER;
 
 	for my $scripts ( sort keys %DEFER ) {
 		$CFG{RUNSCRIPTFQ} = $scripts;
@@ -535,8 +536,9 @@ sub runit
 		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
 		if ( $CFG{DRYRUN} ) {
-			say $CFG{RUN_START} if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ );
-			say $_;
+			say "# RUN_START\n" . $CFG{RUN_START}
+			  if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ );
+			say "# $KEY\n" . $_;
 		} else {
 			if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ ) {
 				say $CFG{RUN_START} if $CFG{'VERBOSE'};

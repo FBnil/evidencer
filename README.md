@@ -237,6 +237,7 @@ caveat: Unfortunately, it does not look inside servergroups to make the server l
 The configuration file contains many variables you can set. You can also define your own (Just stick to what perl calls "word characters" letters, numbers and underscore)
 | CFG Variable | What it does|
 |----|---|
+|BASEDIR| The directory where the `evidencer` binary is located|
 |TEMP| The directory where temporal files are created. Temporal files are needed when you use @hostnames_regexp, because we need a subset of servers from the content of the servergroup file. The default is a `./temp/` subdirectory where the evidencer script is located.
 |SUITDIR|The directory where are the suit directories are in. The default is a `./suit/` subdirectory where the evidencer script is located.|
 |SUIT|Defaults to `..` this way, you do not need to worry about having a suit directory, you'll have `./servers/` and `./scripts/`here in the same directory evidencer resides|
@@ -262,6 +263,7 @@ All variables that have to do with running found combinations of servers and scr
 |RUNSCRIPTFQ|Fully Qualified name for the scripts file, basically: `%{RUNSCRIPTSDIR}`/`%{RUNSCRIPT}`|
 |RUNSERVERFQ|Fully Qualified name for the servers file, basically: `%{RUNSERVERSDIR}`/`%{RUNSERVER}`|
 |RUNNAME|The name of the scripts file being processed %{RUNSCRIPT}, but stripped of the `=` and everything to the right|
+|RUNNAMES|If you `--bundle` or `--fold` you might want to use the `+` concated scripts names, instead of `RUNNAME` which will contain only the last one|
 |TEST|Argument string given with --test on the commandline (available as `%{TEST}`). It can be used in your `RUN_PRE_TEST` or `RUN_TEST`, which only activate when --test is used|
 |RUN_PRE_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip before `RUN_PRE` |
 |RUN_PRE|Execute this string in the shell. Runs before `RUN`. Time date strings are set before `RUN_PRE` and are the same for `RUN` and `RUN_POST` even if they take time to execute. Exit nonzero to skip.|
