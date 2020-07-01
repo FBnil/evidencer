@@ -264,7 +264,7 @@ All variables that have to do with running found combinations of servers and scr
 |RUNSERVERFQ|Fully Qualified name for the servers file, basically: `%{RUNSERVERSDIR}`/`%{RUNSERVER}`|
 |RUNNAME|The name of the scripts file being processed %{RUNSCRIPT}, but stripped of the `=` and everything to the right|
 |RUNNAMES|If you `--bundle` or `--fold` you might want to use the `+` concated scripts names, instead of `RUNNAME` which will contain only the last one|
-|TEST|Argument string given with --test on the commandline (available as `%{TEST}`). It can be used in your `RUN_PRE_TEST` or `RUN_TEST`, which only activate when --test is used|
+|TEST|Argument string given with --test on the commandline (available as `%{TEST}`). It can be used in your `RUN_PRE_TEST` or `RUN_TEST` (and `RUN_POST_TEST`), which only activate when --test is used|
 |RUN_PRE_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip before `RUN_PRE` |
 |RUN_PRE|Execute this string in the shell. Runs before `RUN`. Time date strings are set before `RUN_PRE` and are the same for `RUN` and `RUN_POST` even if they take time to execute. Exit nonzero to skip.|
 |RUN_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip `RUN` (but `RUN_PRE` already ran if it was defined)|
@@ -279,7 +279,7 @@ All variables that have to do with running found combinations of servers and scr
 |RUN_ABORT|Execute this string in the shell when a fatal error occurred: When evidencer could not read or create a file it needs to run|
 
 All `RUN*` commands have a `*_FAIL` counterpart. If the exitcode of the command is nonzero, then the `*_FAIL` will be run.
-The `RUN_PRE` is a special case, when RUN_PRE returns with a nonzero exitcode, then RUN_PRE_FAIL will run, and then `RUN` and `RUN_POST` will be skipped. To override this, end your command with `;true`.
+The `RUN_PRE` is a special case: when RUN_PRE returns with a nonzero exitcode, then `RUN_PRE_FAIL` will also run, but then the rest, like `RUN` and `RUN_POST` will be skipped. To override this, end your `RUN_PRE` command with `;true`.
 
 If you use arguments (either by adding a single argument with `-a` or using `--` at the end of the parameters, and adding your parameter(s) after it; then, if you have defined:
 `RUN_PRE_TEST_ARG`, `RUN_PRE_ARG`, `RUN_TEST_ARG`, `RUN_ARG`, `RUN_POST_TEST_ARG`, `RUN_POST_ARG` Then those commands will be used instead. In both cases, `%{ARG}` will be available to be used. 
@@ -289,7 +289,7 @@ If you use arguments (either by adding a single argument with `-a` or using `--`
 ```sh
 RUN_PRE=ls /tmp/fobaar ; true
 RUN_PRE_FAIL=echo "I will never run because RUN_PRE returns always zero/true"
-RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
+RUN=%{BASEDIR}/bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
 RUN_FAIL=echo "B0RKEN %{RUNNAME} %{ERRORCODE}" >> %{RUNRESULTSDIR}/%{RUNNAME}.err
 RUN_POST=ls /tmp/pqowieur | tee -a /tmp/log.log ; . ./bin/ec.1
 RUN_POST_FAIL=echo "I will run if the file /tmp/pqowieur does not exist"
@@ -312,7 +312,7 @@ YMDHM=%{YMD}_%{HH}%{MM}
 ```
 Which you can use in your RUN definition and it expands to an ISO datestring but only just before running (before RUN_START, RUN_PRE (even when undefined) and RUN_FINISH):
 ```
-RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTSDIR}/HEADER.sh %{RUNSCRIPTFQ}|tee -a %{RUNRESULTSDIR}/%{RUNNAME}-%{YMD}.log
+RUN=%{BASEDIR}/bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTSDIR}/HEADER.sh %{RUNSCRIPTFQ}|tee -a %{RUNRESULTSDIR}/%{RUNNAME}-%{YMD}.log
 ```
 | TIME Variable | What it does|
 |----|---|
@@ -425,8 +425,8 @@ Now you have bundled or folded and will run less `RUN=` commands, but you still 
 If you have an evidencer.cfg that looks like this:
 ```sh
 ALIAS PARALLEL=RUN=%{PARALLEL_RUN}
-PARALLEL_RUN=./bin/ssh-batch --bg-log-dir %{RUNRESULTSDIR} %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}-parallel.log
-RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
+PARALLEL_RUN=%{BASEDIR}/bin/ssh-batch --bg-log-dir %{RUNRESULTSDIR} %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}-parallel.log
+RUN=%{BASEDIR}/bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
 ```
 
 We can replace the `RUN` variable with another value:
@@ -446,8 +446,8 @@ For anything more complex, consider using a separate configuration file and call
 If you have an evidencer.cfg that looks like this:
 ```sh
 ALIAS PARALLEL=RUN=%{PARALLEL_RUN}
-PARALLEL_RUN=./bin/ssh-batch --bg-log-dir %{RUNRESULTSDIR} %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}-parallel.log
-RUN=./bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
+PARALLEL_RUN=%{BASEDIR}/bin/ssh-batch --bg-log-dir %{RUNRESULTSDIR} %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}-parallel.log
+RUN=%{BASEDIR}/bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
 ```
 
 We can replace the `RUN` variable with another value:
