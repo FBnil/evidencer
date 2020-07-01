@@ -90,6 +90,7 @@ sub readCFG
 			'_SELECTED_SUIT' => $NEWSUIT || '..',
 		)
 	);
+
 	updateTime( \%CFG );    # cfgfile might need the variables.
 	my ( $name, $path, $suffix ) = fileparse( $me, '.pl' );
 	my $_CFGFILE =
@@ -359,8 +360,6 @@ for my $argv (@ARGV) {
 						}
 					}
 				}
-
-				close(FIN);
 
 				say "Filter(\@) matched "
 				  . ( $#servers + 1 )
