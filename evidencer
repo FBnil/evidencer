@@ -178,17 +178,22 @@ for my $argv (@ARGV) {
 	my %SCRIPT_FILES;
 	my @REG_SCRIPTS;
 	my @REG_SERVERS;
+	my ( $suit, $scripts, $hoststr );
+	if ( index( $argv, '@' ) > -1 ) {
+		( $scripts, $hoststr ) = split( '@', $argv, 2 );
+		$scripts =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+		$argv = $scripts . '@' . $hoststr;
+	} else {
+		$argv =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+	}
 	say "Processing ARG: $argv" if $CFG{'VERBOSE'};
-	my ( $suit, $scripts ) =
+	( $suit, $scripts ) =
 	  index( $argv, ':' ) > -1 ? split( ':', $argv, 2 ) : ( $SUIT || $CFG{'SUIT'}, $argv );
 	readCFG( $CFGFILE, $suit ) if ( $CFG{'_SELECTED_SUIT'} ne $suit );
-	my $hoststr = "";
 	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $argv, '@' ) > -1;
 	$hoststr = '.' if $CFG{'UNFOLD'} && !$hoststr;
 	$CFG{'ARGV'} = $argv;
 
-	$suit    =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g  for keys %{ $CFG{'ALIAS'} };
-	$scripts =~ s{(?:\b|^)$_\b}{$CFG{'ALIAS'}{$_}}g for keys %{ $CFG{'ALIAS'} };
 	if ( index( $scripts, ' ' ) > -1 ) {
 		push @ARGV, map { /:/ ? $_ : "$suit:$_" } split / +/, $scripts;
 		next;
@@ -536,9 +541,9 @@ sub runit
 		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
 		if ( $CFG{DRYRUN} ) {
-			say "# RUN_START\n" . $CFG{RUN_START}
+			say "# RUN_START:\n" . $CFG{RUN_START}
 			  if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ );
-			say "# $KEY\n" . $_;
+			say "# $KEY:\n" . $_;
 		} else {
 			if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ ) {
 				say $CFG{RUN_START} if $CFG{'VERBOSE'};
