@@ -48,26 +48,26 @@ for my $d (keys %S){
   }
 }
 
-@_ = `$exe -s BUILDTEST TEST1= -d -v |grep RUN`;
+@_ = `$exe -s BUILDTEST TEST1= -d -v |grep -v '# RUN:'|grep RUN`;
 say @_;
 is($#_,2-1,'two lines 1');
 like($_[0], qr/TEST1=\+\+ET on VM-ET/, 'TEST1 on ET');
 like($_[1], qr/TEST1=\+\+PR on VM-PR/, 'TEST1 on PR');
 
 
-@_ = `$exe -s BUILDTEST =++ET -d -v |grep RUN`;
+@_ = `$exe -s BUILDTEST =++ET -d -v |grep -v '# RUN:'|grep RUN`;
 say @_;
 is($#_,2-1,'two lines 2');
 like($_[0], qr/TEST1=\+\+ET on VM-ET/, 'TEST1 on ET');
 like($_[1], qr/TEST2=\+\+ET on VM-ET/, 'TEST2 on ET');
 
 
-@_ = `$exe -s BUILDTEST TEST1=++PR -d -v |grep RUN`;
+@_ = `$exe -s BUILDTEST TEST1=++PR -d -v |grep -v '# RUN:'|grep RUN`;
 say @_;
 is($#_,1-1,'one line');
 like($_[0], qr/TEST1=\+\+PR on VM-PR/, 'TEST1 on PR');
 
-@_ = `$exe -s BUILDTEST TEST2=++PR+ -d -v |grep RUN`;
+@_ = `$exe -s BUILDTEST TEST2=++PR+ -d -v |grep -v '# RUN:'|grep RUN`;
 say @_;
 is($#_,2-1,'two lines dmz');
 like($_[0], qr/TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR');
@@ -76,7 +76,7 @@ like($_[1], qr/TEST2=\+\+PR\+ on VM-PR-DMZ/, 'TEST2 on PR with dmz');
 subtest 'Grouping' => sub {
   plan tests => 2;
 
-  @_ = `$exe -s BUILDTEST TEST2=++PR+ -g -d -v |grep RUN`;
+  @_ = `$exe -s BUILDTEST TEST2=++PR+ -g -d -v |grep -v '# RUN:'|grep RUN`;
   say @_;
   is($#_,1-1,'one line grouped');
   like($_[0], qr/TEST2=\+\+PR\+ on VM-PR  VM-PR-DMZ/, 'grouped');
@@ -85,7 +85,7 @@ subtest 'Grouping' => sub {
 subtest 'Folding1' => sub {
   plan tests => 3;
 
-  @_ = `$exe -s BUILDTEST =++ET -f -d -v |grep -e RUN -e echo`;
+  @_ = `$exe -s BUILDTEST =++ET -f -d -v |grep -v '# RUN:'|grep -e RUN -e echo`;
   say @_;
   is($#_,2-1,'two lines folded');
   like($_[0], qr/TEST1=\+\+ET  TEST2=\+\+ET on VM-ET/, 'folded');
@@ -97,7 +97,7 @@ subtest 'Folding1' => sub {
 subtest 'bundling parameters' => sub {
   plan tests => 3;
 
-  @_ = `$exe -s BUILDTEST =++ET -fdv |grep -e RUN -e echo`;
+  @_ = `$exe -s BUILDTEST =++ET -fdv |grep -v '# RUN:'|grep -e RUN -e echo`;
   say @_;
   is($#_,2-1,'two lines bundled');
   like($_[0], qr/TEST1=\+\+ET  TEST2=\+\+ET on VM-ET/, 'bundling');
@@ -108,7 +108,7 @@ subtest 'bundling parameters' => sub {
 
 subtest 'serverregexp' => sub {
   plan tests => 2;
-  @_ = `$exe -s BUILDTEST =++ET\@svr1et -d -v |grep RUN`;
+  @_ = `$exe -s BUILDTEST =++ET\@svr1et -d -v |grep -v '# RUN:'|grep RUN`;
   say @_;
   like($_[0], qr/BUILDTEST:TEST1=\+\+ET on BUILDTEST#TEST1=\+\+ET#VM-ET/, 'newserverfile1');
   like($_[1], qr/BUILDTEST:TEST2=\+\+ET on BUILDTEST#TEST2=\+\+ET#VM-ET/, 'newserverfile2');
@@ -124,10 +124,10 @@ subtest 'redefine' => sub {
 
 subtest 'argument1' => sub {
   plan tests => 2;
-  @_ = `$exe -s BUILDTEST TEST2=++ET\@svr1et -d -v -r ALTERNATIVE1 -- --fantastic 4 |grep ^echo`;
+  @_ = `$exe -s BUILDTEST TEST2=++ET\@svr1et -d -v -- --fantastic 4 |grep ^echo`;
   say @_;
   like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument --fantastic 4!, 'argument1a');
-  @_ = `$exe -s BUILDTEST TEST2=++ET\@svr1et -d -v -r ALTERNATIVE1 -a incredible |grep ^echo`;
+  @_ = `$exe -s BUILDTEST TEST2=++ET\@svr1et -d -v -a incredible |grep ^echo`;
   say @_;
   like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument incredible!, 'argument2a');
 };
