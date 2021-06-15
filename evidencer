@@ -76,7 +76,7 @@ sub readCFG
 	my ( $NEWCFG, $NEWSUIT ) = @_;
 	$NEWCFG  = $NEWCFG  || '';
 	$NEWSUIT = $NEWSUIT || '';
-	my $me      = dirname( abs_path( readlink($0) ) ) . '/' . basename($0);
+	my $me      = dirname( abs_path( -l $0 ? readlink($0) : $0 ) ) . '/' . basename($0);
 	my $BASEDIR = dirname $me;
 	%CFG = (
 		%BASECFG,
@@ -99,7 +99,7 @@ sub readCFG
 	  || ($NEWSUIT
 		? $CFG{'SUITDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
 		: $path . $name . '.cfg' );
-		 -f $_CFGFILE
+        -f $_CFGFILE
 	  || -f ( $_CFGFILE = $path . $name . '.cfg' )
 	  || -f ( $_CFGFILE = $path . 'cfg/' . $name . '.cfg' )
 	  || -f ( $_CFGFILE = $path . '../cfg/' . $name . '.cfg' );
@@ -181,17 +181,14 @@ for my $argv (@ARGV) {
 	my @REG_SCRIPTS;
 	my @REG_SERVERS;
 	my ( $suit, $scripts, $hoststr );
-	if ( index( $argv, '@' ) > -1 ) {
-		( $scripts, $hoststr ) = split( '@', $argv, 2 );
-		$scripts =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
-		$argv = $scripts . '@' . $hoststr;
-	} else {
-		$argv =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
-	}
+	$argv = unalias($argv);
 	say "Processing ARG: $argv" if $CFG{'VERBOSE'};
 	( $suit, $scripts ) =
 	  index( $argv, ':' ) > -1 ? split( ':', $argv, 2 ) : ( $SUIT || $CFG{'SUIT'}, $argv );
-	readCFG( $CFGFILE, $suit ) if ( $CFG{'_SELECTED_SUIT'} ne $suit );
+	if ($CFG{'_SELECTED_SUIT'} ne $suit){
+		readCFG($CFGFILE,$suit);
+		$scripts = unalias($scripts);
+	}
 	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $argv, '@' ) > -1;
 	$hoststr = '.' if $CFG{'UNFOLD'} && !$hoststr;
 	$CFG{'ARGV'} = $argv;
@@ -492,6 +489,19 @@ if ( !$CFG{'KEEP'} ) {
 runit('RUN_FINISH') if $BASECFG{RUN_STARTED};
 runit('RUN_END');
 exit 0;
+
+# Expand ALIAS variables in the parameters
+sub unalias{
+    my($str) = @_;
+    if(index( $str, '@' ) > -1){
+        my ($expr1, $expr2) = split( '@', $str, 2 );
+        $expr1 =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+        $str = $expr1 . '@' . $expr2;
+    }else{
+        $str =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+    }
+    return $str;
+}
 
 sub executerun
 {
