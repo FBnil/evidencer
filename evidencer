@@ -5,7 +5,7 @@ use Getopt::Long qw(:config no_ignore_case);
 Getopt::Long::Configure("bundling");
 use Pod::Usage;
 use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
-use Cwd 'abs_path';
+use Cwd qw(abs_path getcwd);
 use feature 'say';
 
 my $CFGFILE;
@@ -22,6 +22,7 @@ my %BASECFG = (
 	QUOTESTR  => "'"
 );
 my $SUIT = $ENV{'SUIT'} || "";
+$SUIT = $1 if(!$SUIT && getcwd() =~ m{/suits/(\w+)});
 
 my %opt;
 my ( $opt_help, $opt_man );
@@ -214,6 +215,7 @@ for my $argv (@ARGV) {
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
 	my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
 	my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
+	$hoststr.="";
 	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts) hoststr=($hoststr)"
 	  if $CFG{'DEBUG'};
 	$scriptsdir = abs_path($scriptsdir)
