@@ -76,7 +76,7 @@ sub readCFG
 	my ( $NEWCFG, $NEWSUIT ) = @_;
 	$NEWCFG  = $NEWCFG  || '';
 	$NEWSUIT = $NEWSUIT || '';
-	my $me      = abs_path( dirname($0) ) . '/' . basename($0);
+	my $me      = dirname( abs_path( readlink($0) ) ) . '/' . basename($0);
 	my $BASEDIR = dirname $me;
 	%CFG = (
 		%BASECFG,
