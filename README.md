@@ -166,6 +166,13 @@ Because it will use the `./suits/TEST_SUIT_NAME/evidencer.cfg` or `/dir/othercon
 ./evidencer -c /dir/otherconfig.cfg -s TEST_SUIT_NAME TESTNAME=
 ```
 
+Instead of using the suit name, you can also change into your suit directory and there, create a symlink for the evidencer and run like so:
+
+```sh
+cd suits/TEST_SUIT_NAME
+ln -s ../../evidencer
+./evidencer TESTNAME=
+```
 
 
 ### more examples
@@ -484,7 +491,7 @@ Or set to zero if you do not want quoting (the default, but it could be enabled 
 
 ## I don't like perl
 
-We have a script: evidencer.sh that does the basics, and might be just enough.
+We have a script: evidencer.sh that does the basics, and might be just enough. Create a subdirectory `scripts` and a subdirectory `servers`:
 
 ```sh
 SCRIPT=$1
@@ -500,6 +507,7 @@ ls ./scripts/${ARR[0]}=$SERVERGROUP | while read script;do
     done
 done
 ```
+make sure to test it out, and then modify the line with `#ACTION` to run what you need.
 
 ### usage example
 ```
