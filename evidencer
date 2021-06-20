@@ -656,26 +656,26 @@ To create a suits directory structure:
 
  [OPT         DESCRIPTION]
 
- --help | -h       Print Options and Arguments.
- --man             Print complete man page.
- --verbose | -v    Log more to the screen
- --DEBUG | -D      Log a bit more to the screen
- --dryrun | -d     Do not execute, but show all that would have been run
- --UTC | -U        timestrings are in UTC instead of localtime
- --CREATEDIRS | -C Create directories if they do not exist
- --config | -c $   Read alternative cfg file
- --keep | -k       Do not cleanup temporal files created to accomodate the @hostnames list
- --noautofix | -n  Do not skip running tests on servergroups that match multiple tests
- --unfold | -u     If you have files in your servergroups, recursively read the servers.
- --fold | -f       Group by Scripts
- --group | -g      Group by Servergroups
- --bundle | -b     Concatenate all scripts/servers if they are folded or grouped, into a new file
- --redefine | -r $ Override a variable from evidencer.cfg (can be used multiple times)
- --argument | -a $ Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
- --quote | -q      Quote your scripts and servers using %{QUOTESTR}. Handy for fold and group.
- --SEPARATOR | -S $ The separation characters between folded and grouped items. (default is double space)
- --test | -t $     Final test against a RUN (either before or after RUN_PRE) to validate the combination
- --suit | -s <suit> Only consider this suit for all script-server matches
+ -h | --help        Print Options and Arguments.
+ --man              Print complete man page.
+ -v | --verbose     Log more to the screen
+ -D | --DEBUG       Log a bit more to the screen
+ -d | --dryrun      Do not execute, but show all that would have been run
+ -U | --UTC         timestrings are in UTC instead of localtime
+ -C | --CREATEDIRS  Create directories if they do not exist
+ -c | --config <cfg> Read alternative cfg file
+ -k | --keep        Do not cleanup temporal files created to accomodate the @hostnames list
+ -n | --noautofix   Do not skip running tests on servergroups that match multiple tests
+ -u | --unfold      If you have files in your servergroups, recursively read the servers.
+ -f | --fold        Group by Scripts
+ -g | --group       Group by Servergroups
+ -b | --bundle      Concatenate all scripts/servers if they are folded or grouped, into a new file
+ -r | --redefine  $ Override a variable from evidencer.cfg (can be used multiple times)
+ -a | --argument  $ Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
+ -q | --quote       Quote your scripts and servers using %{QUOTESTR}. Handy for fold and group.
+ -S | --SEPARATOR $ The separation characters between folded and grouped items. (default is double space)
+ -t | --test  <$>   Final test against a RUN (either before or after RUN_PRE) to validate the combination
+ -s | --suit <suit> Only consider this suit for all script-server matches
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 

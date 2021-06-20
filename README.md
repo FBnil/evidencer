@@ -11,26 +11,26 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 
 | OPT | DESCRIPTION |
 | ------ | ------ |
-| --help \| -h       | Print Options and Arguments.|
-| --man        |Print complete man page.|
-| --verbose \| -v    |Log more to the screen|
-| --DEBUG \| -D      |Log a bit more to the screen|
-| --dryrun \| -d     |Do not execute, but show all that would have been run|
-| --UTC \| -U        |timestrings are in UTC instead of localtime |
-| --createdirs \| -C | Create directories if they do not exist |
-| --config \| -c <cfg_file>| Read alternative cfg file|
-| --keep \| -k       |Do not cleanup temporal files created to accomodate the @hostnames list|
-| --noautofix \| -n  |Do not skip running tests on servergroups that match multiple tests|
-| --unfold \| -u     |If you have files in your servergroups, recursively read the servers.|
-| --fold \| -f       |Group by Scripts|
-| --group \| -g      |Group by Servergroups|
-| --bundle \| -b     |Concatenate all scripts/servers if they are folded or grouped|
-| --redefine \| -r  <>|Override a variable from evidencer.cfg (can be used multiple times)|
-| --argument \| -a  <>|Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined) |
-| --quote \| -q      |Quote all scripts and servers files|
-| --SEPARATOR \| -S <str> |The separation characters between folded and grouped items. (default is double space)|
-| --test \| -t <arg> | Final test against a RUN (either before or after RUN_PRE) to validate the combination|
-| --suit \| -s <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
+| -h \| --help       | Print Options and Arguments.|
+| --man              |Print complete man page.|
+| -v \| --verbose    |Log more to the screen|
+| -D \| --DEBUG      |Log a bit more to the screen|
+| -d \| --dryrun     |Do not execute, but show all that would have been run|
+| -U \| --UTC        |timestrings are in UTC instead of localtime |
+| -C \| --createdirs | Create directories if they do not exist |
+| -c \| --config <>| Read alternative cfg file|
+| -k \| --keep  |Do not cleanup temporal files created to accomodate the @hostnames list|
+| -n \| --noautofix |Do not skip running tests on servergroups that match multiple tests|
+| -u \| --unfold |If you have files in your servergroups, recursively read the servers.|
+| -f \| --fold |Group by Scripts|
+| -g \| --group |Group by Servergroups|
+| -b \| --bundle |Concatenate all scripts/servers if they are folded or grouped|
+| -r \| --redefine <>|Override a variable from evidencer.cfg (can be used multiple times)|
+| -a \| --argument <>|Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined) |
+| -q \| --quote       |Quote all scripts and servers files|
+| -S \| --SEPARATOR <str> |The separation characters between folded and grouped items. (default is double space)|
+| -t \| --test <arg> | Final test against a RUN (either before or after RUN_PRE) to validate the combination|
+| -s \| --suit <suit> |search for scripts only from this suit. You can also use the environment variable SUIT|
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
