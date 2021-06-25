@@ -254,6 +254,18 @@ The configuration file contains many variables you can set. You can also define 
 |RESULTS|Just a directory where the results are to be kept. The default is `RESULTS=results`|
 |ALIAS| You can define multiple aliases. The `suit` and the `script` in the commandline parameters are un-aliased. The `hostnames_regexp` is not. Example: `ALIAS ES=ELASTICSEARCH`|
 
+### Levels of evidencer.cfg
+There are 3 levels of evidencer: In the top directory, next to evidencer itself you have evidencer.cfg. This is the master configuration. Then, if you have an evidencer.cfg inside a suit, and you are running tests in that suit, the master configuration becomes that file. And then, also inside the suit, if you have a .cfg with the exact testname, that configuration will be merged with one of the previous two.
+
+so you can have:
+| File | function it provides |
+|----|---|
+|`./evidencer`| |
+|`./evidencer.cfg`| default toplevel configuration|
+|`./suits/mysuit/evidencer.cfg`| if this exists, and you are using this suit, then this becomes the toplevel configuration|
+|`./suits/mysuit/scripts/mytest=+`||
+|`./suits/mysuit/mytest.cfg`| overrides the toplevel configuration with anything in this file, if it exists|
+
 ### RUN variables
 All variables that have to do with running found combinations of servers and scripts
 
