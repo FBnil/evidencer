@@ -20,7 +20,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-C` \| `--createdirs` | Create directories if they do not exist |
 | `-c` \| `--config` `<cfg>`| Read alternative cfg file|
 | `-k` \| `--keep`  |Do not cleanup temporal files created to accomodate the @hostnames list|
-| `-n` \| `--noautofix` |Do not skip running tests on servergroups that match multiple tests|
+| `-n` \| `--noautofix` |Do not skip running scripts on servergroups that match multiple scripts|
 | `-u` \| `--unfold` |If you have files in your servergroups, recursively read the servers.|
 | `-f` \| `--fold` |Group by Scripts|
 | `-g` \| `--group` |Group by Servergroups|
@@ -37,9 +37,9 @@ options can be anywhere in the commandline (but not after the `--` parameter). O
 ## Directories
 
 - `./servers/` Define a list of server by function.
-- `./scripts/` Define a list of tests, by function, to be run on those servers
+- `./scripts/` Define a list of scripts, by function, to be run on those servers
 - `./results/` Just an empty directory to store results in (from an external program)
-- `./suits/`   Once you are done with your tests, move them into a suit, still available, but tucked away
+- `./suits/`   Once you are done building your scripts, move them into a suit, still available, but tucked away
 - `./temp/`    Directory used when you use `@hostnames_regexp`
 
 ## Example
@@ -485,7 +485,7 @@ You can also disable/enable settings, for example if folding is enabled in the C
 ```
 
 ### QUOTE
-If you have a path with spaces, it is useful to quote them before using them, to do this, use `--quote` The default is a single quote. You can override this by setting `QUOTESTR`. Note that setting the `QUOTESTR` will not automatically enabled quoting. 
+If you have a path with spaces, it is useful to quote them before using them, to do this, use `--quote` The default is a single quote. You can override this by setting `QUOTESTR`. Note that setting the `QUOTESTR` by itself will not automatically enabled quoting. 
 You can override it in the CFG:
 ```
 QUOTESTR='
