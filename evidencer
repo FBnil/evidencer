@@ -12,6 +12,7 @@ my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my %RICH;     # for forcing a new servergroup file
 my %CFG;
+my $MELINKED = -l $0; # holds if the current file is a symlink (changes behavior)
 my %BASECFG = (
 	PID       => $$,
 	N         => 0,
@@ -76,10 +77,10 @@ sub readCFG
 	my ( $NEWCFG, $NEWSUIT ) = @_;
 	$NEWCFG  = $NEWCFG  || '';
 	$NEWSUIT = $NEWSUIT || '';
-	my $me      = dirname( abs_path( -l $0 ? readlink($0) : $0 ) ) . '/' . basename($0);
+	my $me      = dirname( abs_path( $MELINKED ? readlink($0) : $0 ) ) . '/' . basename($0);
 	my $BASEDIR = dirname $me;
 	%CFG = (
-		%BASECFG,
+		$NEWCFG && !$NEWSUIT ? %CFG:%BASECFG,
 		(
 			'BASEDIR'        => $BASEDIR,
 			'TEMP'           => $BASEDIR . "/tmp",
@@ -175,6 +176,7 @@ pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR
 
 runit('RUN_BEGIN');
 
+
 # Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
 for my $argv (@ARGV) {
 	my %SCRIPT_FILES;
@@ -186,6 +188,7 @@ for my $argv (@ARGV) {
 	( $suit, $scripts ) =
 	  index( $argv, ':' ) > -1 ? split( ':', $argv, 2 ) : ( $SUIT || $CFG{'SUIT'}, $argv );
 	if ($CFG{'_SELECTED_SUIT'} ne $suit){
+        %CFG = &UnDeepCopy(\%BASECFG);
 		readCFG($CFGFILE,$suit);
 		$scripts = unalias($scripts);
 	}
@@ -222,11 +225,15 @@ for my $argv (@ARGV) {
 
 	# If we are using +, transform it to something glob can use to find servers
 	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
-	readCFG($_)
-	  if ( ( !$SUIT || index( $argv, ':' ) > -1 )
-		&& -f ( $_ = "$CFG{SUITDIR}/$suit/$reg_scripts.cfg" ) );
-	globlize($reg_servers);
 
+	# Read the config for the test, if it exists (merges configuration with existing). 
+	# Bug: when multiple inlines are run, then it does not clean up the cfg from prev.
+	readCFG($_)
+	  if ( ( !$CFGFILE )
+		&& -f ( $_ = "$CFG{SUITDIR}/$suit/$reg_scripts.cfg" ) );
+	$CFG{'TEST'}=$reg_scripts;
+
+	globlize($reg_servers);
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
 	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n" unless @REG_SCRIPTS;
@@ -626,6 +633,26 @@ sub readfiletoarray
 	}
 	close(FIN);
 	@_SVRS;
+}
+
+# 1 level deeper hash copy
+sub UnDeepCopy
+{
+    my %COPY;
+    my $ORG = $_[0];
+    my $typeof;
+    for my $k (keys %$ORG){
+        $typeof=ref($$ORG{$k});
+        if(!$typeof){
+            $COPY{$k} = $$ORG{$k};
+        }elsif($typeof eq 'ARRAY'){
+            @{$COPY{$k}} = @{$$ORG{$k}};
+        }elsif($typeof eq 'HASH'){
+            %{$COPY{$k}} = %{$$ORG{$k}};
+        }
+    }
+
+    %COPY;
 }
 __END__
 
