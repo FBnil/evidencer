@@ -72,9 +72,9 @@ Then you create `evidencer.cfg`, with the following content:
 #Because typing HTTP is much shorter!
 ALIAS HTTPD=APACHE-WEBSERVERS
 _LOGFILE=/tmp/rundeer.%{YEAR}.%{MONTH}.%{DAY}_%{HH}%{MM}.log
-RUNSTART=echo "=====START====="
-RUNFINISH=echo "=====END====="
-RUNABORT=echo "=====FATAL ERROR====="
+RUN_START=echo "=====START====="
+RUN_FINISH=echo "=====END====="
+RUN_ABORT=echo "=====FATAL ERROR====="
 RUN_PRE=RUN_PRE=echo "%{PID} %{RUNSCRIPTSDIR} %{RUNSERVERSDIR}%{NEWLINE} %{RUNSUIT}  %{RUNSCRIPT}  %{RUNSERVER}"
 RUN=./bin/rundeer -m ./%{SCRIPTS}/%{RUNSCRIPT} -f ./%{SERVERS}/%{RUNSERVER} >> %{_LOGFILE} |tee -a %{RUNRESULTSDIR}/%{RUNNAME}
 #RUN_POST
