@@ -58,6 +58,7 @@ GetOptions(
 	'argument|a:s'  => \$BASECFG{ARG},
 	'quote|q'       => \$BASECFG{QUOTE},
 	'test|t:s'      => \$BASECFG{TEST},
+	'warnings|w'    => \$BASECFG{WARNINGS},
 ) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
@@ -236,9 +237,10 @@ for my $argv (@ARGV) {
 	globlize($reg_servers);
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
-	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n" unless @REG_SCRIPTS;
+	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n" unless @REG_SCRIPTS || !$CFG{'WARNINGS'};
 
 	# Now, for the found scripts, check the servers part and match it against it's $reg_server
+	my $matches=0;
 	for my $script (@REG_SCRIPTS) {
 		@REG_SERVERS = ();
 		my ( $reg_script, $reg_server ) = split "=", $script, 2;
@@ -247,7 +249,7 @@ for my $argv (@ARGV) {
 		say "For $script, search for servers: $reg_server in $serversdir argv:($argv)"
 		  if $CFG{'DEBUG'};
 		push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
-		warn "Nothing found for $CFG{'SERVERS'}/$reg_server\n" unless @REG_SERVERS;
+		warn "No server files found that match $CFG{'SERVERS'}/$reg_server\n" unless @REG_SERVERS || !$CFG{'WARNINGS'};
 
 		# And for that real server string representing a file, match our pattern $scripts
 		for my $server (@REG_SERVERS) {
@@ -257,12 +259,13 @@ for my $argv (@ARGV) {
 			globlize($scriptsreg);
 			$scriptsreg .= '$';
 			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
-			my $matches = $scriptserver =~ /$scriptsreg/;
+			my $is_match = $scriptserver =~ /$scriptsreg/;
+			++$matches if $is_match;
 			say
 "check FIT argv: $argv script: $script scripts:$scripts\n scriptsreg: $scriptsreg scriptserver: $scriptserver\n"
-			  . " server=$server  $scriptserver =~/ $scriptsreg / matches=$matches"
+			  . " server=$server  $scriptserver =~/ $scriptsreg / matches=$is_match"
 			  if $CFG{'DEBUG'};
-			++$SCRIPT_FILES{ $suit . ':' . $script }{ $suit . ':' . $server } if $matches;
+			++$SCRIPT_FILES{ $suit . ':' . $script }{ $suit . ':' . $server } if $is_match;
 
 			if ($hoststr) {
 
@@ -271,6 +274,7 @@ for my $argv (@ARGV) {
 			}
 		}
 	}
+	warn "No scripts and server files found for $argv\n" if(@REG_SCRIPTS && !$matches && $CFG{'WARNINGS'});
 
 # Now loop over all scripts and make sure they do not overlap tests. For example, say:
 # You have test1=VM+ and test1=VM-ET, so the servergroup VM-ET matches both, clearly it is better to run test1=VM-ET
