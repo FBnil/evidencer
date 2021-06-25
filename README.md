@@ -31,6 +31,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-S` \| `--SEPARATOR` `<str>` |The separation characters between folded and grouped items. (default is double space)|
 | `-t` \| `--test` `<arg>` | Final test against a RUN (either before or after RUN_PRE) to validate the combination|
 | `-s` \| `--suit` `<suit>` |search for scripts only from this suit. You can also use the environment variable SUIT|
+| `-w` \| `--warnings` |Enable warnings when your script=server combination does not match anything. Set WARNINGS=1 in the configuration file to enable it by default|
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
