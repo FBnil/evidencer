@@ -130,14 +130,15 @@ sub readCFG
 	}
 	if ( $CFG{REDEFINE} ) {
 		for my $redef ( @{ $CFG{REDEFINE} } ) {
+			my $_redef = $redef;
 			if ( index( $redef, "=" ) == -1 ) {
 				if ( index( $redef, "," ) > -1 ) {
 					push @{ $CFG{REDEFINE} }, split /,/, $redef;
 					next;
 				}
-				$redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+				$_redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 			}
-			@_ = split "=", $redef, 2;
+			@_ = split "=", $_redef, 2;
 			say "# redef=($redef)" if $CFG{'DEBUG'};
 			if ( index( $_[1], "%{" ) > -1 ) {
 				xexpand( $_[1], '%\{(\w+)\}', \%CFG );
@@ -274,7 +275,7 @@ for my $argv (@ARGV) {
 			}
 		}
 	}
-	warn "No scripts and server files found for $argv\n" if(@REG_SCRIPTS && !$matches && $CFG{'WARNINGS'});
+	warn "No scripts and server files found for $scripts ($argv)\n" if(@REG_SCRIPTS && !$matches && $CFG{'WARNINGS'});
 
 # Now loop over all scripts and make sure they do not overlap tests. For example, say:
 # You have test1=VM+ and test1=VM-ET, so the servergroup VM-ET matches both, clearly it is better to run test1=VM-ET
