@@ -43,6 +43,9 @@ options can be anywhere in the commandline (but not after the `--` parameter). O
 - `./suits/`   Once you are done building your scripts, move them into a suit, still available, but tucked away
 - `./temp/`    Directory used when you use `@hostnames_regexp`
 
+Tip: to create the top-level directories (except ./temp/ which you might want to redefine in a configuration first) use the following command:
+`./evidencer -s .. -C`
+
 ## Example
 Say you have the following servergroups (files that contain servernames/ipadresses on each line)
 ```sh
@@ -527,3 +530,25 @@ make sure to test it out, and then modify the line with `#ACTION` to run what yo
 ./evidencer.sh test*=++ET
 ./evidencer.sh *=*
 ```
+
+## Parameter completion
+Evidencer has rudimentary tab-completion:
+Add the following into your bashrc script:
+```
+function _getopt_complete () {
+ COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` --complete ${COMP_WORDS[@]:0} ));
+}
+complete -F _getopt_complete evidencer
+```
+tip: Make sure your ./scripts/ are executable (chmod +x) and have a '=' sign in their name.
+
+## Focus on one suit
+You can go into a suit, pull evidencer your way, and symlink that directory to your home for quick access, like so:
+```
+cd suits/mysuit
+ln -s ../../evidencer
+ln -s `pwd` ~/quick
+cd ~/quick
+./evidencer
+```
+Tip: When working from within a suit, you do not need to add the "-s suit" or mention the "suit:", it is implied.
