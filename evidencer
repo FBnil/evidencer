@@ -11,7 +11,8 @@ use feature 'say';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my %RICH;     # for forcing a new servergroup file
-my %CFG;
+my %CFG;      # Variable configuration
+my %_CFG;     # BASE configuration 
 my $MELINKED = -l $0; # holds if the current file is a symlink (changes behavior)
 my %BASECFG = (
 	PID       => $$,
@@ -26,7 +27,7 @@ my $SUIT = $ENV{'SUIT'} || "";
 $SUIT = $1 if(!$SUIT && getcwd() =~ m{/suits/(\w+)});
 
 my %opt;
-my ( $opt_help, $opt_man );
+my ( $opt_help, $opt_man, $opt_complete );
 
 # Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
 if ( grep /^\-\-$/, @ARGV ) {
@@ -37,9 +38,10 @@ if ( grep /^\-\-$/, @ARGV ) {
 	$BASECFG{ARG} = join " ", @_;
 }
 
-GetOptions(
+our %OPTIONS = (
 	'help|h|?!'     => \$opt_help,
 	'man!'          => \$opt_man,
+	'complete!'     => \$opt_complete,
 	'config|c=s'    => \$CFGFILE,
 	'DEBUG|D'       => \$BASECFG{DEBUG},
 	'verbose|v'     => \$BASECFG{VERBOSE},
@@ -59,7 +61,8 @@ GetOptions(
 	'quote|q'       => \$BASECFG{QUOTE},
 	'test|t:s'      => \$BASECFG{TEST},
 	'warnings|w'    => \$BASECFG{WARNINGS},
-) or pod2usage( -verbose => 0 );
+);
+GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
 my %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
@@ -68,7 +71,7 @@ pod2usage( -verbose => 1 ) if defined $opt_help;
 pod2usage( -verbose => 2 ) if defined $opt_man;
 
 # Make sure at least one argument provided
-if ( !@ARGV && !$BASECFG{'CREATEDIRS'} ) {
+if ( !$opt_complete && !@ARGV && !$BASECFG{'CREATEDIRS'} ) {
 	pod2usage( -verbose => 0, -message => "$0: one argument required" );
 }
 
@@ -86,11 +89,11 @@ sub readCFG
 			'BASEDIR'        => $BASEDIR,
 			'TEMP'           => $BASEDIR . "/tmp",
 			'SUITDIR'        => $BASEDIR . "/suits",
-			'SUIT'           => '..',
+			'SUIT'           => $NEWSUIT || $CFG{'SUIT'} || '..',
 			'SERVERS'        => 'servers',
 			'SCRIPTS'        => 'scripts',
 			'RESULTS'        => 'results',
-			'_SELECTED_SUIT' => $NEWSUIT || '..',
+			'_SELECTED_SUIT' => $NEWSUIT || $CFG{'SUIT'} || '..',
 		)
 	);
 
@@ -101,7 +104,7 @@ sub readCFG
 	  || ($NEWSUIT
 		? $CFG{'SUITDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
 		: $path . $name . '.cfg' );
-        -f $_CFGFILE
+		 -f $_CFGFILE
 	  || -f ( $_CFGFILE = $path . $name . '.cfg' )
 	  || -f ( $_CFGFILE = $path . 'cfg/' . $name . '.cfg' )
 	  || -f ( $_CFGFILE = $path . '../cfg/' . $name . '.cfg' );
@@ -130,7 +133,7 @@ sub readCFG
 	}
 	if ( $CFG{REDEFINE} ) {
 		for my $redef ( @{ $CFG{REDEFINE} } ) {
-			my $_redef = $redef;
+            my $_redef = $redef;
 			if ( index( $redef, "=" ) == -1 ) {
 				if ( index( $redef, "," ) > -1 ) {
 					push @{ $CFG{REDEFINE} }, split /,/, $redef;
@@ -150,6 +153,117 @@ sub readCFG
 
 readCFG( $CFGFILE, $SUIT );
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
+%_CFG = UnDeepCopy(\%CFG); # Backup real base configuration so each test can change it
+
+# Completions
+# USAGE:
+#
+# function _getopt_complete () {
+#  COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` --complete ${COMP_WORDS[@]:0} ));
+# }
+#
+# complete -F _getopt_complete evidencer
+#
+
+if($opt_complete){
+	my $search = "";
+	my @candidates;
+	my %K;
+
+	$search = $ARGV[$ENV{'COMP_CWORD'}] || "";
+	# $search =~s/\\=/=/; # remove backquote before equals, set by Completions
+	my $realsearch = $search;
+
+	if($search=~m/^\-/){
+		my $dashes=0;
+		@candidates = keys %OPTIONS;
+		if($search=~s/^\-\-//){
+			s/\|[^:]*// for @candidates;
+			$dashes=2;
+		}elsif($search=~s/^\-//){
+			s/.*\|// for @candidates;
+			$dashes=1;
+		push @candidates, '--';
+		}
+		s/:.*/ <> / for @candidates;
+		@candidates = grep { index($_,$search) > -1} @candidates;
+		@candidates = map { $_ = '-' x $dashes . $_ } @candidates;
+		say join " ", sort @candidates;
+		exit 0;
+	}
+    
+	opendir(my $dh, $CFG{'SCRIPTS'}) || die "Can't opendir $CFG{'SCRIPTS'} $!";
+	my @methods = grep { /=/ && -x "$CFG{'SCRIPTS'}/$_" } readdir($dh);
+	closedir $dh;
+
+	opendir($dh, $CFG{'SERVERS'}) || die "Can't opendir $CFG{'SERVERS'} $!";
+	my @serverfiles = grep { /=/ && -x "$CFG{'SERVERS'}/$_" } readdir($dh);
+	closedir $dh;
+
+    if(!$search){ # If we have nothing yet, suggest methods up until the first point (if they have)
+		my @M = @methods;
+		++$K{$_} for grep { s/=\K.*//; s/\..*/\./ || s/=\K.*// } @M;
+		for my $k (keys %K){
+			if($k=~/\.$/ && $K{$k}==1){
+				my ($n) = grep {/^$k.*/} @methods;
+				$K{$n} = delete $K{$k};
+			}
+		}
+		@candidates = keys %K;
+		say join " ", @candidates;
+		exit;		
+	}elsif($search !~ /=/ && $ARGV[$ENV{'COMP_CWORD'} -1] ne "="){
+		my @M = @methods;
+		my $s = join "#", grep {/^$search/} @methods;
+		++$K{$_} for grep { s/^$search[^\.]*?\K\..*/\./ || /^$search/ } grep {/^$search/} @M;
+		for my $k (keys %K){
+			if($k=~/\.$/ && $K{$k}==1){
+				my ($n) = grep {/^$k.*/} @methods;
+				$K{$n} = delete $K{$k};
+			}
+		}
+		@candidates = keys %K;
+	}
+	if($ARGV[$ENV{'COMP_CWORD'} -1] eq "=" || $search eq "="){
+		$search = $search eq "="?  $ARGV[$ENV{'COMP_CWORD'} -1] . '=+': $ARGV[$ENV{'COMP_CWORD'} -2] . '=' . $search;
+		@candidates = ($search.'*');
+	}
+
+	%K=();
+	my %T=();
+
+	for my $k (@candidates){
+		%CFG = UnDeepCopy(\%_CFG);
+		if($k !~ /=/){
+			++$K{$k};
+		}else{
+			my %X = getscripts(getSuitAndScriptsAndHostStr($k),$k);
+			for my $i (keys %X){
+				for my $j (keys %{$X{$i}}){
+					my $a = $i;
+					my $b = $j;
+					$a=~s/=.*//;
+					$b=~s/.*://;
+					$a=~s/.*:// unless $k=~/:/; 
+					++$T{$a};
+					my $c = "$a=$b";
+					$c=~s/^$k// if $k=~/\-$/;
+					$c=~s/.*=// if ($realsearch eq "=") || ($realsearch!~/=/ && $ARGV[$ENV{'COMP_CWORD'} -1] eq "=");
+					++$K{$c};
+				}
+			}
+		}
+	}
+	
+	# if we have more than 1 test, only display testnames, else also with servernames
+	if(scalar keys %T >1){
+		say join " ", sort keys %T;
+	}else{
+		say join " ", sort keys %K;
+	}
+	
+	exit;
+}
 
 sub md
 {
@@ -178,46 +292,42 @@ pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR
 
 runit('RUN_BEGIN');
 
-
-# Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
-for my $argv (@ARGV) {
-	my %SCRIPT_FILES;
-	my @REG_SCRIPTS;
-	my @REG_SERVERS;
-	my ( $suit, $scripts, $hoststr );
+# Split argument string into suit, scripts and hoststr (suit:scripts=+:hoststr)
+sub getSuitAndScriptsAndHostStr{
+	my ($argv) = @_;
+	$argv =~s/\\=/=/; # remove backquote before equals, when set by Completions
+	$argv =~s/\\:/:/; # remove backquote before colon, when set by Completions
 	$argv = unalias($argv);
-	say "Processing ARG: $argv" if $CFG{'VERBOSE'};
-	( $suit, $scripts ) =
+	$CFG{'ARGV'} = $argv;
+	my ( $suit, $scripts, $hoststr ) =
 	  index( $argv, ':' ) > -1 ? split( ':', $argv, 2 ) : ( $SUIT || $CFG{'SUIT'}, $argv );
+	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $argv, '@' ) > -1;
 	if ($CFG{'_SELECTED_SUIT'} ne $suit){
-        %CFG = &UnDeepCopy(\%BASECFG);
+		%CFG = &UnDeepCopy(\%BASECFG);
 		readCFG($CFGFILE,$suit);
 		$scripts = unalias($scripts);
 	}
-	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $argv, '@' ) > -1;
-	$hoststr = '.' if $CFG{'UNFOLD'} && !$hoststr;
-	$CFG{'ARGV'} = $argv;
-
-	if ( index( $scripts, ' ' ) > -1 ) {
-		push @ARGV, map { /:/ ? $_ : "$suit:$_" } split / +/, $scripts;
-		next;
-	}
-
 	# make a proper scripts (add =* if not there)
 	$scripts .= '=' unless index( $scripts, '=' ) > -1;
 	$scripts =~ s/=$/=*/;
 	$scripts =~ s/^=/*=/;
-
-# allow for ALIASes to have %{} variables, and be expanded inside $scripts (but why did you use variables?).
+	# allow for ALIASes to have %{} variables, and be expanded inside $scripts
 	if ( index( $scripts, "%{" ) > -1 ) {
 		updateTime( \%CFG );
 		my $v = xexpand( $scripts, '%\{(\w+)\}', \%CFG );
 	}
+	return ( $suit, $scripts, $hoststr );
+}
 
+
+sub getscripts{
+	my ( $suit, $scripts, $hoststr, $argv ) = @_;
+	my @REG_SCRIPTS;
+	my @REG_SERVERS;
+	my %SCRIPT_FILES;
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
 	my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
 	my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
-	$hoststr.="";
 	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts) hoststr=($hoststr)"
 	  if $CFG{'DEBUG'};
 	$scriptsdir = abs_path($scriptsdir)
@@ -225,9 +335,8 @@ for my $argv (@ARGV) {
 	$serversdir = abs_path($serversdir)
 	  || pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $serversdir\n" );
 
-	# If we are using +, transform it to something glob can use to find servers
+	# Isolate the $reg_scripts, there might be a configuration file for it
 	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
-
 	# Read the config for the test, if it exists (merges configuration with existing). 
 	# Bug: when multiple inlines are run, then it does not clean up the cfg from prev.
 	readCFG($_)
@@ -235,7 +344,9 @@ for my $argv (@ARGV) {
 		&& -f ( $_ = "$CFG{SUITDIR}/$suit/$reg_scripts.cfg" ) );
 	$CFG{'TEST'}=$reg_scripts;
 
-	globlize($reg_servers);
+	# If we are using +, transform it to something glob can use to find servers
+	#globlize($reg_servers);
+	
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
 	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n" unless @REG_SCRIPTS || !$CFG{'WARNINGS'};
@@ -276,9 +387,35 @@ for my $argv (@ARGV) {
 		}
 	}
 	warn "No scripts and server files found for $scripts ($argv)\n" if(@REG_SCRIPTS && !$matches && $CFG{'WARNINGS'});
+	%SCRIPT_FILES
+}
 
-# Now loop over all scripts and make sure they do not overlap tests. For example, say:
-# You have test1=VM+ and test1=VM-ET, so the servergroup VM-ET matches both, clearly it is better to run test1=VM-ET
+# Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
+for my $argv (@ARGV) {
+
+	# Should the argument have come quoted and is more than one, then split and add it to the loop
+	if ( index( $argv, ' ' ) > -1 ) {
+		push @ARGV, split / +/, $argv;
+		next;
+	}
+
+	say "Processing ARG: $argv" if $CFG{'VERBOSE'};
+
+	%CFG = UnDeepCopy(\%_CFG) if $#ARGV; # only restore if more than one test
+	my ( $suit, $scripts, $hoststr ) = getSuitAndScriptsAndHostStr($argv);
+	if(!$hoststr){
+		if( $CFG{'UNFOLD'} ){
+			$hoststr = '.';
+		}else{
+			$hoststr = "";
+		}
+	}
+	say "Processing: suit($suit) scripts($scripts) hoststr($hoststr)" if $CFG{'VERBOSE'};
+	
+	my %SCRIPT_FILES = getscripts( $suit, $scripts, $hoststr, $argv );
+
+	# Now loop over all scripts and make sure they do not overlap tests. For example, say:
+	# You have test1=VM+ and test1=VM-ET, so the servergroup VM-ET matches both, clearly it is better to run test1=VM-ET
 	if ( !$CFG{'NOAUTOFIX'} ) {
 		my %TEST2SCRIPT;
 		for my $suitscript ( sort keys %SCRIPT_FILES ) {
@@ -411,6 +548,7 @@ for my $argv (@ARGV) {
 	}
 }
 
+# If running actions were defered (because of folding/grouping/bundling), run them now
 if (%DEFER) {
 
 	if ( $CFG{'GROUP'} ) {
@@ -491,6 +629,7 @@ if (%DEFER) {
 	}
 }
 
+# Remove all temporal files, unless KEEP is set
 if ( !$CFG{'KEEP'} ) {
 	for my $tmpfile ( @{ $CFG{_CLEANUP} } ) {
 		say "removing temporal file $tmpfile" if $CFG{'VERBOSE'};
@@ -498,7 +637,7 @@ if ( !$CFG{'KEEP'} ) {
 	}
 }
 
-runit('RUN_FINISH') if $BASECFG{RUN_STARTED};
+runit('RUN_FINISH') if $BASECFG{'RUN_STARTED'};
 runit('RUN_END');
 exit 0;
 
@@ -586,10 +725,11 @@ sub runit
 # transform lazy search into a glob-able pattern
 sub globlize
 {
-	$_[0] =~ s/^(\+\+)|(=\K\+\+)|(\+\+)$/$1||$2?"*-":"-*"/ge;
-	while ( $_[0] =~ s/\+\+|\-\-/-*-/g ) { }
-	$_[0] =~ s/\+/\*/g;
-	$_[0] =~ s/^(\-)|(\-)$/$2\*$1/g;
+	$_[0] =~ s/^(\+\+)|(=\K\+\+)|(\+\+)$/$1||$2?"*-":"-*"/ge; # ++ to *
+	while ( $_[0] =~ s/\+\+|\-\-/-*-/g ) { } # ++ to -*-
+	$_[0] =~ s/\+/\*/g; # all other + to *
+	$_[0] =~ s/^\-/\*-/g; # if starts with -, then *-
+	$_[0] =~ s/\-$/-\*/g; # if ends with -, then  -*
 }
 
 # xexpands %{} variables
