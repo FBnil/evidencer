@@ -39,35 +39,35 @@ if ( grep /^\-\-$/, @ARGV ) {
 }
 
 our %OPTIONS = (
-	'help|h|?!'     => \$opt_help,
+	'h|help|?!'     => \$opt_help,
 	'man!'          => \$opt_man,
 	'complete!'     => \$opt_complete,
-	'config|c=s'    => \$CFGFILE,
-	'DEBUG|D'       => \$BASECFG{DEBUG},
-	'verbose|v'     => \$BASECFG{VERBOSE},
-	'dryrun|d'      => \$BASECFG{DRYRUN},
-	'UTC|U'         => \$BASECFG{UTC},
-	'CREATEDIRS|C'  => \$BASECFG{CREATEDIRS},
-	'keep|k'        => \$BASECFG{KEEP},
-	'noautofix|n'   => \$BASECFG{NOAUTOFIX},
-	'unfold|u'      => \$BASECFG{UNFOLD},
-	'fold|f'        => \$BASECFG{FOLD},
-	'group|g'       => \$BASECFG{GROUP},
-	'bundle|b'      => \$BASECFG{BUNDLE},
-	'redefine|r=s@' => \$BASECFG{REDEFINE},
-	'suit|s:s'      => \$SUIT,
-	'SEPARATOR|S:s' => \$BASECFG{SEPARATOR},
-	'argument|a:s'  => \$BASECFG{ARG},
-	'quote|q'       => \$BASECFG{QUOTE},
-	'test|t:s'      => \$BASECFG{TEST},
-	'warnings|w'    => \$BASECFG{WARNINGS},
+	'c|config=s'    => \$CFGFILE,
+	'D|DEBUG'       => \$BASECFG{DEBUG},
+	'v|verbose'     => \$BASECFG{VERBOSE},
+	'd|dryrun'      => \$BASECFG{DRYRUN},
+	'U|UTC'         => \$BASECFG{UTC},
+	'C|CREATEDIRS'  => \$BASECFG{CREATEDIRS},
+	'k|keep'        => \$BASECFG{KEEP},
+	'n|noautofix'   => \$BASECFG{NOAUTOFIX},
+	'u|unfold'      => \$BASECFG{UNFOLD},
+	'f|fold'        => \$BASECFG{FOLD},
+	'g|group'       => \$BASECFG{GROUP},
+	'b|bundle'      => \$BASECFG{BUNDLE},
+	'r|redefine=s@' => \$BASECFG{REDEFINE},
+	's|suit:s'      => \$SUIT,
+	'S|SEPARATOR:s' => \$BASECFG{SEPARATOR},
+	'a|argument:s'  => \$BASECFG{ARG},
+	'q|quote'       => \$BASECFG{QUOTE},
+	't|test:s'      => \$BASECFG{TEST},
+	'w|warnings'    => \$BASECFG{WARNINGS},
 );
 GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
 my %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
 
-pod2usage( -verbose => 1 ) if defined $opt_help;
+pod2usage( -verbose => 1 ) if defined $opt_help && !@ARGV;
 pod2usage( -verbose => 2 ) if defined $opt_man;
 
 # Make sure at least one argument provided
@@ -100,15 +100,14 @@ sub readCFG
 	updateTime( \%CFG );    # cfgfile might need the variables.
 	my ( $name, $path, $suffix ) = fileparse( $me, '.pl' );
 	my $_CFGFILE = $NEWCFG
-	  || (
-		  $NEWSUIT
-		? $CFG{'SUITDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
-		: $path . $name . '.cfg'
-	  );
-	     -f $_CFGFILE
-	  || -f ( $_CFGFILE = $path . $name . '.cfg' )
-	  || -f ( $_CFGFILE = $path . 'cfg/' . $name . '.cfg' )
-	  || -f ( $_CFGFILE = $path . '../cfg/' . $name . '.cfg' );
+		|| (
+			$NEWSUIT
+			? $CFG{'SUITDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
+			: $path . $name . '.cfg' );
+	-f $_CFGFILE
+		|| -f ( $_CFGFILE = $path . $name . '.cfg' )
+		|| -f ( $_CFGFILE = $path . 'cfg/' . $name . '.cfg' )
+		|| -f ( $_CFGFILE = $path . '../cfg/' . $name . '.cfg' );
 
 	if ( -f $_CFGFILE ) {
 		$CFG{'CFGFILE'} = $_CFGFILE;
@@ -133,11 +132,11 @@ sub readCFG
 		$CFG{$k} = $ENV{$k} if defined $ENV{$k};
 	}
 	if ( $CFG{REDEFINE} ) {
-		for my $redef ( @{ $CFG{REDEFINE} } ) {
+		for my $redef ( @{ $CFG{'REDEFINE'} } ) {
 			my $_redef = $redef;
 			if ( index( $redef, "=" ) == -1 ) {
 				if ( index( $redef, "," ) > -1 ) {
-					push @{ $CFG{REDEFINE} }, split /,/, $redef;
+					push @{ $CFG{'REDEFINE'} }, split /,/, $redef;
 					next;
 				}
 				$_redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
@@ -156,6 +155,45 @@ readCFG( $CFGFILE, $SUIT );
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 %_CFG = UnDeepCopy( \%CFG );    # Backup real base configuration so each test can change it
 
+# Help for the last argument given.
+# Add verbose: -hv  to also show the extra help #+: in the script
+# Add a + in the argument to search for the term in-between the method scripts
+# use a dot to show all help from all scripts that have it
+if($opt_help && @ARGV && !$opt_complete) {
+	# Read all fils in ./scripts/ that are methods (i.e. have the form: script=serverfilter)
+	opendir( my $dh, $CFG{'SCRIPTS'} ) || die "Can't opendir $CFG{'SCRIPTS'} $!";
+	my @methods = grep { /=/ && -x "$CFG{'SCRIPTS'}/$_" } readdir($dh);
+	closedir $dh;
+
+	my %K;
+	my $search = pop @ARGV; # only consider the last argument parameter given
+	$search =~ s/=\K.*//; # remove the server part, if there
+
+	# Deep search for a word inside anny comments in the scripts, and display that method
+	my $better = $search=~s/\+//;
+	if($better){
+		for my $k (@methods){
+			++$K{$k} if readfiletoarray("$CFG{'SCRIPTS'}/$k",0,"#.*$search");
+		}
+		@methods = keys %K; # show help for all methods found with the searchterm
+	}else{
+		%K=();
+		++$K{$_} for grep { /$search/i } @methods; # search in names only
+	}
+
+	my $BOLD = "\033[1m";
+	my $NORM = "\033[0m";
+	for my $k (sort keys %K){
+		my ($title) = split /=/, $k;
+		my @txt = readfiletoarray("$CFG{'SCRIPTS'}/$k",0, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
+		say "\n=== ${BOLD}${title}${NORM} ===\n";
+		say join "\n", grep { s/^#\+?:// } @txt;
+		say "";
+	}
+
+	exit 0;
+}
+
 # Completions
 # USAGE:
 #
@@ -165,8 +203,8 @@ say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 #
 # complete -F _getopt_complete evidencer
 #
-
-if ($opt_complete) {
+if ($opt_complete)
+{
 	my $search = "";
 	my @candidates;
 	my %K;
@@ -180,7 +218,7 @@ if ($opt_complete) {
 	if ( $search =~ m/^\-/ ) {
 		my $dashes = 0;
 		@candidates = keys %OPTIONS;
-		if ( $search =~ s/^\-\-// ) {
+		if ( $opt_complete =~ s/^\-\-// ) {
 			s/\|[^:]*// for @candidates;
 			$dashes = 2;
 		} elsif ( $search =~ s/^\-// ) {
@@ -203,24 +241,29 @@ if ($opt_complete) {
 	my @serverfiles = grep { /=/ && -x "$CFG{'SERVERS'}/$_" } readdir($dh);
 	closedir $dh;
 
-	if ( !$search )
-	{    # If we have nothing yet, suggest methods up until the first point (if they have)
+	if ( !$search ) {
+		# If we have nothing yet, suggest methods up until the first point (if they have)
 		my @M = @methods;
 		++$K{$_} for grep { s/=\K.*//; s/\..*/\./ || s/=\K.*// } @M;
 		@candidates = keys %K;
-		say join " ", @candidates;
-		exit;
+		unless ($#candidates == 0 && $candidates[0] =~ /\.$/){
+			say join " ", @candidates;
+			exit ;
+		}
 	} elsif ( $search !~ /=/ && $ARGV[ $ENV{'COMP_CWORD'} - 1 ] ne "=" ) {
 		my @M = @methods;
-		my $s = join "#", grep { /^$search/ } @methods;
-		++$K{$_} for grep { s/^$search[^\.]*?\K\..*/\./ || /^$search/ } grep { /^$search/ } @M;
+		if($search=~s/\+/.*/g){
+			++$K{$_} for grep { /$search/ } @M;
+		}else{
+			++$K{$_} for grep { s/^$search[^\.]*?\K\..*/\./ || /^$search/ } grep { /^$search/ } @M;
+		}
 		@candidates = keys %K;
 	}
 	if ( $ARGV[ $ENV{'COMP_CWORD'} - 1 ] eq "=" || $search eq "=" ) {
 		$search =
-		    $search eq "="
-		  ? $ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=+'
-		  : $ARGV[ $ENV{'COMP_CWORD'} - 2 ] . '=' . $search;
+			$search eq "="
+			? $ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=+'
+			: $ARGV[ $ENV{'COMP_CWORD'} - 2 ] . '=' . $search;
 		@candidates = ( $search . '*' );
 	}
 
@@ -231,6 +274,7 @@ if ($opt_complete) {
 
 	%K = ();
 	my %T = ();
+
 
 	for my $k (@candidates) {
 		%CFG = UnDeepCopy( \%_CFG );
@@ -303,7 +347,7 @@ sub getSuitAndScriptsAndHostStr
 	$argv = unalias($argv);
 	$CFG{'ARGV'} = $argv;
 	my ( $suit, $scripts, $hoststr ) =
-	  index( $argv, ':' ) > -1 ? split( ':', $argv, 2 ) : ( $SUIT || $CFG{'SUIT'}, $argv );
+		index( $argv, ':' ) > -1 ? split( ':', $argv, 2 ) : ( $SUIT || $CFG{'SUIT'}, $argv );
 	( $scripts, $hoststr ) = split( '@', $scripts, 2 ) if index( $argv, '@' ) > -1;
 	if ( $CFG{'_SELECTED_SUIT'} ne $suit ) {
 		%CFG = &UnDeepCopy( \%BASECFG );
@@ -332,14 +376,14 @@ sub getscripts
 	my %SCRIPT_FILES;
 
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
-	my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
-	my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
+	my $scriptsdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
+	my $serversdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
 	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts) hoststr=($hoststr)"
-	  if $CFG{'DEBUG'};
+		if $CFG{'DEBUG'};
 	$scriptsdir = abs_path($scriptsdir)
-	  || pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $scriptsdir\n" );
+		|| pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $scriptsdir\n" );
 	$serversdir = abs_path($serversdir)
-	  || pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $serversdir\n" );
+		|| pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $serversdir\n" );
 
 	# Isolate the $reg_scripts, there might be a configuration file for it
 	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
@@ -347,9 +391,9 @@ sub getscripts
 	# Read the config for the test, if it exists (merges configuration with existing).
 	# Bug: when multiple inlines are run, then it does not clean up the cfg from prev.
 	readCFG($_)
-	  if ( ( !$CFGFILE )
+		if ( ( !$CFGFILE )
 		&& -f ( $_ = "$CFG{SUITDIR}/$suit/$reg_scripts.cfg" ) );
-	$CFG{'TEST'} = $reg_scripts;
+	$CFG{'RUNSCRIPT'} = $reg_scripts; # make it available
 
 	# If we are using +, transform it to something glob can use to find servers
 	#globlize($reg_servers);
@@ -357,7 +401,7 @@ sub getscripts
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
 	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n"
-	  unless @REG_SCRIPTS || !$CFG{'WARNINGS'};
+		unless @REG_SCRIPTS || !$CFG{'WARNINGS'};
 
 	# Now, for the found scripts, check the servers part and match it against it's $reg_server
 	my $matches = 0;
@@ -384,19 +428,18 @@ sub getscripts
 			++$matches if $is_match;
 			say
 "check FIT argv: $argv script: $script scripts:$scripts\n scriptsreg: $scriptsreg scriptserver: $scriptserver\n"
-			  . " server=$server  $scriptserver =~/ $scriptsreg / matches=$is_match"
-			  if $CFG{'DEBUG'};
+				. " server=$server  $scriptserver =~/ $scriptsreg / matches=$is_match"
+				if $CFG{'DEBUG'};
 			++$SCRIPT_FILES{ $suit . ':' . $script }{ $suit . ':' . $server } if $is_match;
 
 			if ($hoststr) {
-
 				# TODO: give it a pointer to where $hoststr has regexp (split /,/)
 				@{ $SCRIPT_FILES{ $suit . ':' . $script }{'!'} } = split /,/, $hoststr;
 			}
 		}
 	}
 	warn "No scripts and server files found for $scripts ($argv)\n"
-	  if ( @REG_SCRIPTS && !$matches && $CFG{'WARNINGS'} );
+		if ( @REG_SCRIPTS && !$matches && $CFG{'WARNINGS'} );
 	%SCRIPT_FILES;
 }
 
@@ -463,10 +506,10 @@ for my $argv (@ARGV) {
 
 	for my $suitscript ( sort keys %SCRIPT_FILES ) {
 		my ( $suit, $script ) = split ":", $suitscript, 2;
-		my $scriptsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
-		$CFG{RUNSCRIPTSDIR} = $scriptsdir = abs_path $scriptsdir;
-		my $resultsdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'RESULTS'};
-		$CFG{RUNRESULTSDIR} = $resultsdir = abs_path $resultsdir;
+		my $scriptsdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
+		$CFG{'RUNSCRIPTSDIR'} = $scriptsdir = abs_path $scriptsdir;
+		my $resultsdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'RESULTS'};
+		$CFG{'RUNRESULTSDIR'} = $resultsdir = abs_path $resultsdir;
 		for my $suitserver ( grep { !/^!$/ } sort keys %{ $SCRIPT_FILES{$suitscript} } ) {
 			if ( $SCRIPT_FILES{$suitscript}{$suitserver} == 0 ) {
 				say "SKIPPING $suitscript $suitserver ($SCRIPT_FILES{$suitscript}{$suitserver})"
@@ -474,33 +517,33 @@ for my $argv (@ARGV) {
 				next;
 			}
 			my ( $suit, $server ) = split ":", $suitserver, 2;
-			my $serversdir = $CFG{SUITDIR} . '/' . $suit . '/' . $CFG{'SERVERS'};
-			$CFG{RUNSERVERSDIR} = $serversdir     = abs_path $serversdir;
-			$CFG{RUNSUIT}       = $suit;
-			$CFG{RUNNAME}       = $CFG{RUNSCRIPT} = $script;
-			$CFG{RUNNAME} =~ s/=.*//;
-			$CFG{RUNSERVER}   = $server;
-			$CFG{RUNSCRIPTFQ} = $CFG{RUNSCRIPTSDIR} . '/' . $CFG{RUNSCRIPT};
-			$CFG{RUNSERVERFQ} = $CFG{RUNSERVERSDIR} . '/' . $CFG{RUNSERVER};
+			my $serversdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
+			$CFG{'RUNSERVERSDIR'} = $serversdir     = abs_path $serversdir;
+			$CFG{'RUNSUIT'}       = $suit;
+			$CFG{'RUNNAME'}       = $CFG{'RUNSCRIPT'} = $script;
+			$CFG{'RUNNAME'} =~ s/=.*//;
+			$CFG{'RUNSERVER'}   = $server;
+			$CFG{'RUNSCRIPTFQ'} = $CFG{'RUNSCRIPTSDIR'} . '/' . $CFG{'RUNSCRIPT'};
+			$CFG{'RUNSERVERFQ'} = $CFG{'RUNSERVERSDIR'} . '/' . $CFG{'RUNSERVER'};
 
-			if ( $CFG{UNFOLD} && !defined $RICH{ $CFG{RUNSERVERFQ} } ) {
-				if ( !defined $RICH{ $CFG{RUNSERVERFQ} } ) {
+			if ( $CFG{'UNFOLD'} && !defined $RICH{ $CFG{'RUNSERVERFQ'} } ) {
+				if ( !defined $RICH{ $CFG{'RUNSERVERFQ'} } ) {
 
 			# read file if we havent done so, and check if it contains nested files, or sidecomments
 					readfiletoarray( $CFG{RUNSERVERFQ} );
 
 					if ( $CFG{'UNFOLDED'} || $CFG{'RICH'} ) {
-						$RICH{ $CFG{RUNSERVERFQ} } = 1;
+						$RICH{ $CFG{'RUNSERVERFQ'} } = 1;
 					} else {
-						$RICH{ $CFG{RUNSERVERFQ} } = 0;
+						$RICH{ $CFG{'RUNSERVERFQ'} } = 0;
 					}
 				}
-				push @{ $SCRIPT_FILES{$suitscript}{'!'} }, '.' if $RICH{ $CFG{RUNSERVERFQ} };
+				push @{ $SCRIPT_FILES{$suitscript}{'!'} }, '.' if $RICH{ $CFG{'RUNSERVERFQ'} };
 			}
 
 			if ( defined $SCRIPT_FILES{$suitscript}{'!'} ) {
 				say "###$script:opening $CFG{RUNSERVERFQ} for $CFG{RUNSCRIPTFQ}" if $CFG{'DEBUG'};
-				my @read_servers = readfiletoarray( $CFG{RUNSERVERFQ} );
+				my @read_servers = readfiletoarray( $CFG{'RUNSERVERFQ'} );
 				my @servers;
 				my $counter = 0;
 				while ( $_ = shift @read_servers ) {
@@ -527,33 +570,33 @@ for my $argv (@ARGV) {
 				  if $CFG{'DEBUG'};
 				next unless @servers;    # no matches, skip this test
 				     # only create a temporal file if we do not match ALL servers in this group.
-				if ( $#servers + 1 < $counter || $RICH{ $CFG{RUNSERVERFQ} } ) {
+				if ( $#servers + 1 < $counter || $RICH{ $CFG{'RUNSERVERFQ'} } ) {
 					my $tempfile =
 					    ( $suit eq ".." ? '_' : $suit ) . '#'
 					  . $script . '#'
 					  . $server . '#'
 					  . $CFG{PID};
-					push @{ $CFG{_CLEANUP} }, ( $CFG{RUNSERVERFQ} = $CFG{TEMP} . '/' . $tempfile );
-					$CFG{RUNSERVERSDIR} = $CFG{TEMP};
-					$CFG{RUNSERVER} = $server = $tempfile;
-					open( FOUT, '>', $CFG{RUNSERVERFQ} ) or abort("$CFG{RUNSERVERFQ}: $!");
+					push @{ $CFG{'_CLEANUP'} }, ( $CFG{'RUNSERVERFQ'} = $CFG{'TEMP'} . '/' . $tempfile );
+					$CFG{'RUNSERVERSDIR'} = $CFG{'TEMP'};
+					$CFG{'RUNSERVER'} = $server = $tempfile;
+					open( FOUT, '>', $CFG{'RUNSERVERFQ'} ) or abort("$CFG{RUNSERVERFQ}: $!");
 					say FOUT $_ for @servers;
 					close FOUT;
 				}
 			}
 
 			# enquote
-			if ( $CFG{QUOTE} ) {
+			if ( $CFG{'QUOTE'} ) {
 				for my $fq (qw(RUNSCRIPTFQ RUNSERVERFQ)) {
 					$CFG{$fq} =~ s/($CFG{QUOTESTR})/\\$1/g;
-					$CFG{$fq} = $CFG{QUOTESTR} . $CFG{$fq} . $CFG{QUOTESTR};
+					$CFG{$fq} = $CFG{'QUOTESTR'} . $CFG{$fq} . $CFG{'QUOTESTR'};
 				}
 			}
 
-			if ( $CFG{FOLD} || $CFG{GROUP} || $CFG{BUNDLE} ) {
-				$DEFER{ $CFG{RUNSCRIPTFQ} }{ $CFG{RUNSERVERFQ} }++;
+			if ( $CFG{'FOLD'} || $CFG{'GROUP'} || $CFG{'BUNDLE'} ) {
+				$DEFER{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }++;
 			} else {
-				$CFG{RUNNAMES} = $CFG{RUNNAME};
+				$CFG{'RUNNAMES'} = $CFG{'RUNNAME'};
 				&executerun();
 			}
 		}
@@ -565,7 +608,7 @@ if (%DEFER) {
 
 	if ( $CFG{'GROUP'} ) {
 		for my $script ( keys %DEFER ) {
-			my $str = join $CFG{SEPARATOR}, sort keys %{ $DEFER{$script} };
+			my $str = join $CFG{'SEPARATOR'}, sort keys %{ $DEFER{$script} };
 			undef $DEFER{$script};
 			$DEFER{$script}{"$str"} = 1;
 		}
@@ -580,62 +623,62 @@ if (%DEFER) {
 		}
 		%DEFER = ();
 		for my $k ( keys %FOLD ) {
-			my $str = join $CFG{SEPARATOR}, sort keys %{ $FOLD{$k} };
+			my $str = join $CFG{'SEPARATOR'}, sort keys %{ $FOLD{$k} };
 			$DEFER{$str}{$k} = 1;
 		}
 	}
 
-	$CFG{RUNNAMES} = join '+', grep { s{.*/}{}; s{=.*}{}; } sort keys %DEFER;
+	$CFG{'RUNNAMES'} = join '+', grep { s{.*/}{}; s{=.*}{}; } sort keys %DEFER;
 
 	for my $scripts ( sort keys %DEFER ) {
 		$CFG{RUNSCRIPTFQ} = $scripts;
 		for my $servers ( sort keys %{ $DEFER{$scripts} } ) {
-			$CFG{RUNSERVERFQ} = $servers;
+			$CFG{'RUNSERVERFQ'} = $servers;
 
-			if ( $CFG{BUNDLE} ) {
-				if ( index( $scripts, $CFG{SEPARATOR} ) > -1 ) {
+			if ( $CFG{'BUNDLE'} ) {
+				if ( index( $scripts, $CFG{'SEPARATOR'} ) > -1 ) {
 					my $tempfile =
-					    ( $CFG{RUNSUIT} eq ".." ? '_' : $CFG{RUNSUIT} )
+					    ( $CFG{'RUNSUIT'} eq ".." ? '_' : $CFG{'RUNSUIT'} )
 					  . '#BUNDLESCRIPTS#'
-					  . $CFG{N} . '#'
-					  . $CFG{PID};
-					push @{ $CFG{_CLEANUP} }, ( $CFG{RUNSCRIPTFQ} = $CFG{TEMP} . '/' . $tempfile );
-					say "# BUNDLING SCRIPTS $scripts" if $CFG{VERBOSE};
-					$CFG{RUNSCRIPTSDIR} = $CFG{TEMP};
-					$CFG{RUNSCRIPT}     = $tempfile;
-					open( FOUT, '>', $CFG{RUNSCRIPTFQ} ) or abort("$CFG{RUNSCRIPTFQ}: $!");
-					for my $file ( split /$CFG{SEPARATOR}/, $scripts ) {
-						say "## BUNDLING SCRIPT $file" if $CFG{DEBUG};
+					  . $CFG{'N'} . '#'
+					  . $CFG{'PID'};
+					push @{ $CFG{'_CLEANUP'} }, ( $CFG{'RUNSCRIPTFQ'} = $CFG{'TEMP'} . '/' . $tempfile );
+					say "# BUNDLING SCRIPTS $scripts" if $CFG{'VERBOSE'};
+					$CFG{'RUNSCRIPTSDIR'} = $CFG{'TEMP'};
+					$CFG{'RUNSCRIPT'}     = $tempfile;
+					open( FOUT, '>', $CFG{'RUNSCRIPTFQ'} ) or abort("$CFG{RUNSCRIPTFQ}: $!");
+					for my $file ( split /$CFG{'SEPARATOR'}/, $scripts ) {
+						say "## BUNDLING SCRIPT $file" if $CFG{'DEBUG'};
 						say FOUT $_ for readfiletoarray($file);
 					}
 					close FOUT;
 				}
 
-				if ( index( $servers, $CFG{SEPARATOR} ) > -1 ) {
+				if ( index( $servers, $CFG{'SEPARATOR'} ) > -1 ) {
 					my $tempfile =
-					    ( $CFG{RUNSUIT} eq ".." ? '_' : $CFG{RUNSUIT} )
-					  . '#BUNDLESERVERS#'
-					  . $CFG{N} . '#'
-					  . $CFG{PID};
-					push @{ $CFG{_CLEANUP} }, ( $CFG{RUNSERVERFQ} = $CFG{TEMP} . '/' . $tempfile );
-					say "# BUNDLING SERVERS $servers" if $CFG{VERBOSE};
-					$CFG{RUNSERVERSDIR} = $CFG{TEMP};
-					$CFG{RUNSERVER}     = $tempfile;
-					open( FOUT, '>', $CFG{RUNSERVERFQ} ) or abort("$CFG{RUNSERVERFQ}: $!");
+						( $CFG{'RUNSUIT'} eq ".." ? '_' : $CFG{'RUNSUIT'} )
+						. '#BUNDLESERVERS#'
+						. $CFG{'N'} . '#'
+						. $CFG{'PID'};
+					push @{ $CFG{'_CLEANUP'} }, ( $CFG{'RUNSERVERFQ'} = $CFG{'TEMP'} . '/' . $tempfile );
+					say "# BUNDLING SERVERS $servers" if $CFG{'VERBOSE'};
+					$CFG{'RUNSERVERSDIR'} = $CFG{'TEMP'};
+					$CFG{'RUNSERVER'}     = $tempfile;
+					open( FOUT, '>', $CFG{'RUNSERVERFQ'} ) or abort("$CFG{RUNSERVERFQ}: $!");
 					for my $file ( split /$CFG{SEPARATOR}/, $servers ) {
-						say "## BUNDLING SERVER $file" if $CFG{DEBUG};
+						say "## BUNDLING SERVER $file" if $CFG{'DEBUG'};
 						say FOUT $_ for readfiletoarray($file);
 					}
 					close FOUT;
 				}
 			}
 
-			my $script = $CFG{RUNSCRIPTFQ};
-			my $server = $CFG{RUNSERVERFQ};
-			$script =~ s{$CFG{RUNSCRIPTSDIR}/}{}g;
-			$server =~ s{$CFG{RUNSERVERSDIR}/}{}g;
-			$CFG{RUNSCRIPT} = $script;
-			$CFG{RUNSERVER} = $server;
+			my $script = $CFG{'RUNSCRIPTFQ'};
+			my $server = $CFG{'RUNSERVERFQ'};
+			$script =~ s{$CFG{'RUNSCRIPTSDIR'}/}{}g;
+			$server =~ s{$CFG{'RUNSERVERSDIR'}/}{}g;
+			$CFG{'RUNSCRIPT'} = $script;
+			$CFG{'RUNSERVER'} = $server;
 			&executerun();
 		}
 	}
@@ -643,7 +686,7 @@ if (%DEFER) {
 
 # Remove all temporal files, unless KEEP is set
 if ( !$CFG{'KEEP'} ) {
-	for my $tmpfile ( @{ $CFG{_CLEANUP} } ) {
+	for my $tmpfile ( @{ $CFG{'_CLEANUP'} } ) {
 		say "removing temporal file $tmpfile" if $CFG{'VERBOSE'};
 		unlink $tmpfile;
 	}
@@ -680,7 +723,7 @@ sub executerun
 		say "# SCRIPT=$CFG{RUNSCRIPTFQ}";
 		say "# SERVER=$CFG{RUNSERVERFQ}";
 	}
-	$CFG{N} = $BASECFG{N} += 1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
+	$CFG{'N'} = $BASECFG{N} += 1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
 	my $EC;
 	my $REDO = defined $CFG{'REDO'} ? $CFG{'REDO'} : 0;
 	for my $run ( glob "{RUN}{_PRE,,_POST}{_TEST,}" ) {
@@ -715,14 +758,14 @@ sub runit
 		updateTime( \%CFG ) unless $no_time_update;
 		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
-		if ( $CFG{DRYRUN} ) {
-			say "# RUN_START:\n" . $CFG{RUN_START}
-			  if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ );
+		if ( $CFG{'DRYRUN'} ) {
+			say "# RUN_START:\n" . $CFG{'RUN_START'}
+			  if ( defined $CFG{'RUN_START'} && !$BASECFG{'RUN_STARTED'}++ );
 			say "# $KEY:\n" . $_;
 		} else {
-			if ( defined $CFG{RUN_START} && !$BASECFG{RUN_STARTED}++ ) {
-				say $CFG{RUN_START} if $CFG{'VERBOSE'};
-				system $CFG{RUN_START};
+			if ( defined $CFG{'RUN_START'} && !$BASECFG{'RUN_STARTED'}++ ) {
+				say $CFG{'RUN_START'} if $CFG{'VERBOSE'};
+				system $CFG{'RUN_START'};
 			}
 			say $_ if $CFG{'VERBOSE'};
 			my $ec = system $_;
@@ -752,12 +795,12 @@ sub xexpand
 	$_[0];
 }
 
-# Time variables used in AUTOMAINTENANCE expressions
+# Time variables exposed to CFGFILE
 sub updateTime
 {
 	my ( $v, $e ) = @_;
 	$v->{"EPOCH"} = $e = ( $e || time );
-	my @T = $CFG{UTC} ? gmtime($e) : localtime($e);    # S M H d m+1 y+1900 wd yd daylightsaving
+	my @T = $CFG{'UTC'} ? gmtime($e) : localtime($e);    # S M H d m+1 y+1900 wd yd daylightsaving
 	$v->{"HH"} = $T[2] < 10 ? '0' . $T[2] : $T[2];     # hour (00..23)
 	$v->{"MM"} = $T[1] < 10 ? '0' . $T[1] : $T[1];     # minute (00..59)
 	$v->{"SS"} = $T[0] < 10 ? '0' . $T[0] : $T[0];     # seconds (00..23)
@@ -774,12 +817,13 @@ sub updateTime
 
 sub readfiletoarray
 {
-	my ( $_file, $_recursed ) = @_;
-	say "readfiletoarray($_file,$_recursed)" if $CFG{'DEBUG'};
+	my ( $_file, $_recursed, $_filter ) = @_;
+	say "readfiletoarray($_file,$_recursed,$_filter)" if $CFG{'DEBUG'};
 	$CFG{'UNFOLDED'} = $CFG{'RICH'} = 0 unless $_recursed;
 	open( FIN, '<', $_file ) or abort("$_file: $!");
 	my @_SVRS;
 	while (<FIN>) {
+        next if defined $_filter && ! /$_filter/;
 		chomp;
 		if (/\//) {
 			$CFG{'UNFOLDED'}++;    # signal that we unfolded
@@ -865,19 +909,19 @@ To create a suits directory structure:
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
  Example:
- 
+
  # Run, from the suit JAVATRANSACTIONS the test JAVASERVER-SERVICES= for servers JAVA-ET
  # that match the perl regexp javaserver00[1..5] or the substring javaserver0100
  ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
- 
- # show (dryrun) what would run from the suit JAVATRANSACTIONS the test 
+
+ # show (dryrun) what would run from the suit JAVATRANSACTIONS the test
  # JAVASERVER-SERVICES= for any matching servers AND the test JAVASERVER-PORTS for any of it's
  # matching servers
  ./evidencer -s JAVATRANSACTIONS JAVASERVER-SERVICES=* JAVASERVER-PORTS -d
 
  JAVASERVER-SERVICES=* can be written as:
    JAVASERVER-SERVICES=  or as  JAVASERVER-SERVICES=+  or even as  JAVASERVER-SERVICES
- 
+
  The servergroup, can use a plus sign instead of an asterix, and these are the rules:
  +     ==>  *       ++    ==>  *-*     +-+-+ ==>  *-*-*
  +A    ==>  *A      A+    ==>  A*      ++B   ==>  *-B
@@ -887,11 +931,11 @@ Options can be anywhere in the commandline (but not after the `--` parameter). O
  So if you have a servergroup called APACHE-PROD-DMZ, then =++DMZ would match that group.
  And ++PROD++  would match *-PROD-*. These are glob expansions, which means it would match
  exactly what ls would match if you run:  ls ./servers/*-PROD-*
- 
+
  If unsure, escape or quote your servergroup and use dryrun.
- 
+
  @hostnames regexp's are not un-ALIAS-ed.
- 
+
 =head1 LICENSE
 
 This software is released under the Unlicense statement.
