@@ -29,6 +29,9 @@ $SUIT = $1 if ( !$SUIT && getcwd() =~ m{/suits/(\w+)} );
 my %opt;
 my ( $opt_help, $opt_man, $opt_complete );
 
+# Store original ARGV, we use it with Completions, where the COMP_CWORD shift when using modifier arguments
+my @_ARGV = @ARGV;
+
 # Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
 if ( grep /^\-\-$/, @ARGV ) {
 	@_ = ();
@@ -88,7 +91,7 @@ sub readCFG
 		(
 			'BASEDIR'        => $BASEDIR,
 			'TEMP'           => $BASEDIR . "/tmp",
-			'SUITDIR'        => $BASEDIR . "/suits",
+			'SUITSDIR'        => $BASEDIR . "/suits",
 			'SUIT'           => $NEWSUIT || $CFG{'SUIT'} || '..',
 			'SERVERS'        => 'servers',
 			'SCRIPTS'        => 'scripts',
@@ -102,7 +105,7 @@ sub readCFG
 	my $_CFGFILE = $NEWCFG
 		|| (
 			$NEWSUIT
-			? $CFG{'SUITDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
+			? $CFG{'SUITSDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
 			: $path . $name . '.cfg' );
 	-f $_CFGFILE
 		|| -f ( $_CFGFILE = $path . $name . '.cfg' )
@@ -160,9 +163,10 @@ say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 # Add a + in the argument to search for the term in-between the method scripts
 # use a dot to show all help from all scripts that have it
 if($opt_help && @ARGV && !$opt_complete) {
+	my $SUITDIR = $CFG{'SUITSDIR'}.'/'.$CFG{'SUIT'}.'/';
 	# Read all fils in ./scripts/ that are methods (i.e. have the form: script=serverfilter)
-	opendir( my $dh, $CFG{'SCRIPTS'} ) || die "Can't opendir $CFG{'SCRIPTS'} $!";
-	my @methods = grep { /=/ && -x "$CFG{'SCRIPTS'}/$_" } readdir($dh);
+	opendir( my $dh, ${SUITDIR}.$CFG{'SCRIPTS'} ) || die "Can't opendir ${SUITDIR}$CFG{'SCRIPTS'} $!";
+	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } readdir($dh);
 	closedir $dh;
 
 	my %K;
@@ -173,7 +177,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	my $better = $search=~s/\+//;
 	if($better){
 		for my $k (@methods){
-			++$K{$k} if readfiletoarray("$CFG{'SCRIPTS'}/$k",0,"#.*$search");
+			++$K{$k} if readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",0,"#.*$search");
 		}
 		@methods = keys %K; # show help for all methods found with the searchterm
 	}else{
@@ -185,7 +189,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	my $NORM = "\033[0m";
 	for my $k (sort keys %K){
 		my ($title) = split /=/, $k;
-		my @txt = readfiletoarray("$CFG{'SCRIPTS'}/$k",0, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
+		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",0, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		say "\n=== ${BOLD}${title}${NORM} ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
 		say "";
@@ -205,40 +209,62 @@ if($opt_help && @ARGV && !$opt_complete) {
 #
 if ($opt_complete)
 {
+	my $SUITDIR = $CFG{'SUITSDIR'}.'/'.$CFG{'SUIT'}.'/';
+
 	my $search = "";
 	my @candidates;
 	my %K;
+	my $m = $#_ARGV - $ENV{COMP_CWORD};
 
-	$search = $ARGV[ $ENV{'COMP_CWORD'} ] || "";
+	$search = $_ARGV[ $ENV{'COMP_CWORD'} +1 ] || "";
+
+	if($_ARGV[-1] eq '-s' && ($m>0)){
+		say "-s";exit;
+	}
+
+	if(($_ARGV[-1] eq '-s')||($_ARGV[-2] eq '-s' && (! -d $CFG{'SUITSDIR'}.'/'.$_ARGV[-1] || ($m>0)))){
+		opendir( my $dh, $CFG{'SUITSDIR'} ) || die "Can't opendir $CFG{'SUITSDIR'} $!";
+		my @suits = grep { ! /^\./ && -d "$CFG{'SUITSDIR'}/$_" } readdir($dh);
+		closedir $dh;
+		$search=$_ARGV[-1] eq '-s' ? '.' : $_ARGV[-1];
+		@candidates = grep {/^$search/} @suits;
+		say join " ", @candidates;
+		exit;
+	}
 
 	# $search =~s/\\=/=/; # remove backquote before equals, set by Completions
 	my $realsearch = $search;
 
 	# Process parameters that start with -
-	if ( $search =~ m/^\-/ ) {
+	if ( $_ARGV[-1] =~ m/^\-/ && $m >0) {
+		$search = $_ARGV[-1];
 		my $dashes = 0;
 		@candidates = keys %OPTIONS;
-		if ( $opt_complete =~ s/^\-\-// ) {
-			s/\|[^:]*// for @candidates;
+		if ( $search =~ s/^\-\-// ) {
+			s/^.\||[:=].*$// for @candidates;
 			$dashes = 2;
 		} elsif ( $search =~ s/^\-// ) {
-			s/.*\|// for @candidates;
+			s/\|.*// for @candidates;
 			$dashes = 1;
-			push @candidates, '--';
+			push @candidates, '-';
 		}
-		s/:.*/ <> / for @candidates;
-		@candidates = grep { index( $_, $search ) > -1 } @candidates;
-		@candidates = map { $_ = '-' x $dashes . $_ } @candidates;
+		s/:.*// for @candidates;
+		if($search){
+			@candidates = map { $_ = '-' x $dashes . $_ } grep {/^$search/} @candidates;
+		}else{
+			@candidates = map { $_ = '-' x $dashes . $_ } @candidates;
+		}
 		say join " ", sort @candidates;
 		exit 0;
 	}
 
-	opendir( my $dh, $CFG{'SCRIPTS'} ) || die "Can't opendir $CFG{'SCRIPTS'} $!";
-	my @methods = grep { /=/ && -x "$CFG{'SCRIPTS'}/$_" } readdir($dh);
+	# Read all files in ./scripts/ that are methods (i.e. have the form: script=serverfilter and are executable)
+	opendir( my $dh, ${SUITDIR}.$CFG{'SCRIPTS'} ) || die "Can't opendir ${SUITDIR}$CFG{'SCRIPTS'} $!";
+	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } readdir($dh);
 	closedir $dh;
 
-	opendir( $dh, $CFG{'SERVERS'} ) || die "Can't opendir $CFG{'SERVERS'} $!";
-	my @serverfiles = grep { /=/ && -x "$CFG{'SERVERS'}/$_" } readdir($dh);
+	opendir( $dh, ${SUITDIR}.$CFG{'SERVERS'} ) || die "Can't opendir ${SUITDIR}$CFG{'SERVERS'} $!";
+	my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } readdir($dh);
 	closedir $dh;
 
 	if ( !$search ) {
@@ -246,11 +272,11 @@ if ($opt_complete)
 		my @M = @methods;
 		++$K{$_} for grep { s/=\K.*//; s/\..*/\./ || s/=\K.*// } @M;
 		@candidates = keys %K;
-		unless ($#candidates == 0 && $candidates[0] =~ /\.$/){
+		unless ($#candidates == 0 && $candidates[0] =~ /[\.=]$/){
 			say join " ", @candidates;
 			exit ;
 		}
-	} elsif ( $search !~ /=/ && $ARGV[ $ENV{'COMP_CWORD'} - 1 ] ne "=" ) {
+	} elsif ( $search !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] ne "=" ) {
 		my @M = @methods;
 		if($search=~s/\+/.*/g){
 			++$K{$_} for grep { /$search/ } @M;
@@ -259,11 +285,11 @@ if ($opt_complete)
 		}
 		@candidates = keys %K;
 	}
-	if ( $ARGV[ $ENV{'COMP_CWORD'} - 1 ] eq "=" || $search eq "=" ) {
+	if ((@ARGV && $_ARGV[ $ENV{'COMP_CWORD'} ] eq "=") || $search eq "=" ) {
 		$search =
 			$search eq "="
-			? $ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=+'
-			: $ARGV[ $ENV{'COMP_CWORD'} - 2 ] . '=' . $search;
+			? $_ARGV[ $ENV{'COMP_CWORD'} ] . '=+'
+			: $_ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=' . $search;
 		@candidates = ( $search . '*' );
 	}
 
@@ -274,7 +300,6 @@ if ($opt_complete)
 
 	%K = ();
 	my %T = ();
-
 
 	for my $k (@candidates) {
 		%CFG = UnDeepCopy( \%_CFG );
@@ -293,7 +318,7 @@ if ($opt_complete)
 					my $c = "$a=$b";
 					$c =~ s/^$k// if $k =~ /\-$/;
 					$c =~ s/.*=//
-					  if ( $realsearch !~ /=/ && $ARGV[ $ENV{'COMP_CWORD'} - 1 ] eq "=" )
+					  if ( $realsearch !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] eq "=" )
 					  || $realsearch eq '=';
 					++$K{$c};
 				}
@@ -326,15 +351,15 @@ sub md
 if ( $CFG{'CREATEDIRS'} ) {
 	$SUIT = $SUIT || $CFG{'SUIT'};
 	my $c = 0;
-	$c += !!md( $CFG{$_} )                                       for (qw(TEMP SUITDIR));
-	$c += !!md( $CFG{'SUITDIR'} . '/' . $SUIT );
-	$c += !!md( $CFG{'SUITDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
+	$c += !!md( $CFG{$_} )                                       for (qw(TEMP SUITSDIR));
+	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT );
+	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
 	say "$c directories created";
 	exit 0;
 }
 
-pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITDIR'}\n" )
-  unless -d $CFG{'SUITDIR'};
+pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITSDIR'}\n" )
+  unless -d $CFG{'SUITSDIR'};
 
 runit('RUN_BEGIN');
 
@@ -376,8 +401,8 @@ sub getscripts
 	my %SCRIPT_FILES;
 
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
-	my $scriptsdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
-	my $serversdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
+	my $scriptsdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
+	my $serversdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
 	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts) hoststr=($hoststr)"
 		if $CFG{'DEBUG'};
 	$scriptsdir = abs_path($scriptsdir)
@@ -392,7 +417,7 @@ sub getscripts
 	# Bug: when multiple inlines are run, then it does not clean up the cfg from prev.
 	readCFG($_)
 		if ( ( !$CFGFILE )
-		&& -f ( $_ = "$CFG{SUITDIR}/$suit/$reg_scripts.cfg" ) );
+		&& -f ( $_ = "$CFG{SUITSDIR}/$suit/$reg_scripts.cfg" ) );
 	$CFG{'RUNSCRIPT'} = $reg_scripts; # make it available
 
 	# If we are using +, transform it to something glob can use to find servers
@@ -506,9 +531,9 @@ for my $argv (@ARGV) {
 
 	for my $suitscript ( sort keys %SCRIPT_FILES ) {
 		my ( $suit, $script ) = split ":", $suitscript, 2;
-		my $scriptsdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
+		my $scriptsdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
 		$CFG{'RUNSCRIPTSDIR'} = $scriptsdir = abs_path $scriptsdir;
-		my $resultsdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'RESULTS'};
+		my $resultsdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'RESULTS'};
 		$CFG{'RUNRESULTSDIR'} = $resultsdir = abs_path $resultsdir;
 		for my $suitserver ( grep { !/^!$/ } sort keys %{ $SCRIPT_FILES{$suitscript} } ) {
 			if ( $SCRIPT_FILES{$suitscript}{$suitserver} == 0 ) {
@@ -517,7 +542,7 @@ for my $argv (@ARGV) {
 				next;
 			}
 			my ( $suit, $server ) = split ":", $suitserver, 2;
-			my $serversdir = $CFG{'SUITDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
+			my $serversdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
 			$CFG{'RUNSERVERSDIR'} = $serversdir     = abs_path $serversdir;
 			$CFG{'RUNSUIT'}       = $suit;
 			$CFG{'RUNNAME'}       = $CFG{'RUNSCRIPT'} = $script;
