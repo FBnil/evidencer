@@ -848,20 +848,22 @@ sub readfiletoarray
 	my ( $_file, $_recursed, $_filter ) = @_;
 	say "readfiletoarray($_file,$_recursed,$_filter)" if $CFG{'DEBUG'};
 	$CFG{'UNFOLDED'} = $CFG{'RICH'} = 0 unless $_recursed;
-	open( FIN, '<', $_file ) or abort("$_file: $!");
+	open( my $FIN, '<', $_file ) or abort("$_file: $!");
 	my @_SVRS;
-	while (<FIN>) {
+	while (<$FIN>) {
         next if defined $_filter && ! /$_filter/;
 		chomp;
 		if (/\//) {
 			$CFG{'UNFOLDED'}++;    # signal that we unfolded
-			push @_SVRS, readfiletoarray( $_, 1 );
+			s{^\.}{%{SUITSDIR}/%{SUIT}/%{SERVERS}};
+			$_ = xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
+			push @_SVRS, readfiletoarray( $_, 1 , $_filter||undef);
 		} else {
 			$CFG{'RICH'}++ if /\s/;    # signal we have a commented hostfile
 			push @_SVRS, $_;
 		}
 	}
-	close(FIN);
+	close($FIN);
 	@_SVRS;
 }
 
