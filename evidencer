@@ -84,7 +84,7 @@ sub readCFG
 	my ( $NEWCFG, $NEWSUIT ) = @_;
 	$NEWCFG  = $NEWCFG  || '';
 	$NEWSUIT = $NEWSUIT || '';
-	my $me = dirname( abs_path( $MELINKED ? readlink($0) : $0 ) ) . '/' . basename($0);
+	my $me = dirname( abs_path( $MELINKED ? dirname($0).'/'.readlink($0) : $0 ) ) . '/' . basename($0);
 	my $BASEDIR = dirname $me;
 	%CFG = (
 		$NEWCFG && !$NEWSUIT ? %CFG : %BASECFG,
@@ -108,13 +108,14 @@ sub readCFG
 			? $CFG{'SUITSDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
 			: $path . $name . '.cfg' );
 	-f $_CFGFILE
+		|| -f ( $_CFGFILE = $CFG{'SUITSDIR'} . '/' . $NEWSUIT . '/cfg/' . $name . '.cfg' )
 		|| -f ( $_CFGFILE = $path . $name . '.cfg' )
 		|| -f ( $_CFGFILE = $path . 'cfg/' . $name . '.cfg' )
 		|| -f ( $_CFGFILE = $path . '../cfg/' . $name . '.cfg' );
 
 	if ( -f $_CFGFILE ) {
 		$CFG{'CFGFILE'} = $_CFGFILE;
-		say "readCFG($NEWCFG,$NEWSUIT)=$_CFGFILE" if $BASECFG{'VERBOSE'};
+		say "readCFG($NEWCFG,$NEWSUIT)=$_CFGFILE" if $BASECFG{'VERBOSE'} && !$opt_help && !$opt_complete;
 		open( my $CFG, '<', $_CFGFILE ) or abort("$_CFGFILE $!");
 		my %DIRS = map { $_ => 1 } qw(TEMP);
 		while (<$CFG>) {
@@ -417,7 +418,8 @@ sub getscripts
 	# Bug: when multiple inlines are run, then it does not clean up the cfg from prev.
 	readCFG($_)
 		if ( ( !$CFGFILE )
-		&& -f ( $_ = "$CFG{SUITSDIR}/$suit/$reg_scripts.cfg" ) );
+		&& ( -f ( $_ = "$CFG{SUITSDIR}/$suit/$reg_scripts.cfg" ) 
+			|| -f ( $_ = "$CFG{SUITSDIR}/$suit/cfg/$reg_scripts.cfg" )) );
 	$CFG{'RUNSCRIPT'} = $reg_scripts; # make it available
 
 	# If we are using +, transform it to something glob can use to find servers
