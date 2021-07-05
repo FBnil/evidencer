@@ -10,7 +10,7 @@ fi
 
 echo "Downloading ssh-batch and deploying it to ~/bin"
 
-[! -f ssh-batch.zip ] && wget -O ssh-batch.zip https://github.com/FBnil/ssh-batch/archive/refs/heads/master.zip
+[ ! -f ssh-batch.zip ] && wget -O ssh-batch.zip https://github.com/FBnil/ssh-batch/archive/refs/heads/master.zip
 unzip -j ssh-batch.zip -d bin
 MERGE=false
 if [ -d ~/bin ];then
@@ -82,5 +82,7 @@ for t in VM-PR VM-PR-DMZ VM-ET ;do
 done
 echo -e "127.0.0.1" > servers/localhost
 
+
+echo "Now run: ./evidencer  and press tabs a lot to select your script"
 
 
