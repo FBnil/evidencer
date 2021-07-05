@@ -147,7 +147,7 @@ And the third usage of `ALIAS` is for `--redefine`, which has it's own chapter o
 
 ## SUITS
 once you are done with the tests, or you have multiple tests, and do not want to overlap things, move your `./servers/*` and `./scripts/*` into a subdirectory
-called `./suit/TEST_SUIT_NAME/servers/`  and `./suit/TEST_SUIT_NAME/scripts/`
+called `./suits/TEST_SUIT_NAME/servers/`  and `./suits/TEST_SUIT_NAME/scripts/`
 
 To create a suits directory structure:
 ```sh
@@ -251,7 +251,7 @@ The configuration file contains many variables you can set. You can also define 
 |----|---|
 |BASEDIR| The directory where the `evidencer` binary is located|
 |TEMP| The directory where temporal files are created. Temporal files are needed when you use @hostnames_regexp, because we need a subset of servers from the content of the servergroup file. The default is a `./temp/` subdirectory where the evidencer script is located.
-|SUITDIR|The directory where are the suit directories are in. The default is a `./suit/` subdirectory where the evidencer script is located.|
+|SUITSDIR|The directory where are the suit directories are in. The default is a `./suits/` subdirectory where the evidencer script is located.|
 |SUIT|Defaults to `..` this way, you do not need to worry about having a suit directory, you'll have `./servers/` and `./scripts/`here in the same directory evidencer resides|
 |SERVERS|If for some reason, you want the `./servers/` directory name to be different, you can override this name. The default is `SERVERS=servers`|
 |SCRIPTS|If for some reason, you want the `./scripts/` directory name to be different, you can override this name. For example, to use ssh-batch. That program uses `inline` as the directory name. The default is `SCRIPTS=scripts`
@@ -279,8 +279,8 @@ All variables that have to do with running found combinations of servers and scr
 |ARGV|The script+server combination we are running|
 |ARG|Contains the string with the argument(s) passed with `--` or a single argument passed with `-a`|
 |N|A number that increases just before you use the: `RUN_PRE`, `RUN` and `RUN_POST`. Use it like: `%{N}`|
-|RUNSCRIPTSDIR|The directory where the scripts are located, basically: `%{SUITDIR}`/`%{SUIT}`/`%{SCRIPTS}`|
-|RUNSERVERSDIR|The directory where the servergroups are located, basically: `%{SUITDIR}`/`%{SUIT}`/`%{SERVERS}`|
+|RUNSCRIPTSDIR|The directory where the scripts are located, basically: `%{SUITSDIR}`/`%{SUIT}`/`%{SCRIPTS}`|
+|RUNSERVERSDIR|The directory where the servergroups are located, basically: `%{SUITSDIR}`/`%{SUIT}`/`%{SERVERS}`|
 |RUNSUIT|The currently running suit|
 |RUNSCRIPT|The name of the scripts file being processed|
 |RUNSERVER|The name of the servers file being processed|
@@ -289,7 +289,7 @@ All variables that have to do with running found combinations of servers and scr
 |RUNNAME|The name of the scripts file being processed %{RUNSCRIPT}, but stripped of the `=` and everything to the right|
 |RUNNAMES|If you `--bundle` or `--fold` you might want to use the `+` concated scripts names, instead of `RUNNAME` which will contain only the last one|
 |TEST|Argument string given with --test on the commandline (available as `%{TEST}`). It can be used in your `RUN_PRE_TEST` or `RUN_TEST` (and `RUN_POST_TEST`), which only activate when --test is used|
-|RUN_PRE_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip before `RUN_PRE` |
+|RUN_PRE_TEST|Execute this string in the shell to test the validity of the script+server combination. As with all *_TEST, Exit nonzero to skip execution of `RUN_PRE` and all after |
 |RUN_PRE|Execute this string in the shell. Runs before `RUN`. Time date strings are set before `RUN_PRE` and are the same for `RUN` and `RUN_POST` even if they take time to execute. Exit nonzero to skip.|
 |RUN_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip `RUN` (but `RUN_PRE` already ran if it was defined)|
 |RUN|Execute this string in the shell|
@@ -307,6 +307,9 @@ The `RUN_PRE` is a special case: when RUN_PRE returns with a nonzero exitcode, t
 
 If you use arguments (either by adding a single argument with `-a` or using `--` at the end of the parameters, and adding your parameter(s) after it; then, if you have defined:
 `RUN_PRE_TEST_ARG`, `RUN_PRE_ARG`, `RUN_TEST_ARG`, `RUN_ARG`, `RUN_POST_TEST_ARG`, `RUN_POST_ARG` Then those commands will be used instead. In both cases, `%{ARG}` will be available to be used. 
+
+So the order is: RUN_BEGIN, RUN_START, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN_POST_TEST, RUN_POST, RUN_FINISH,  RUN_END. and a *_FAIL for each of these and a RUN_ABORT when file IO fails.
+
 
 #### example
 
@@ -533,7 +536,7 @@ make sure to test it out, and then modify the line with `#ACTION` to run what yo
 
 ## Parameter completion
 Evidencer has rudimentary tab-completion:
-Add the following into your bashrc script:
+Add the following into your bashrc script and source it, or open a new terminal:
 ```
 function _getopt_complete () {
  COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` --complete ${COMP_WORDS[@]:0} ));
@@ -542,8 +545,16 @@ complete -F _getopt_complete evidencer
 ```
 tip: Make sure your ./scripts/ are executable (chmod +x) and have a '=' sign in their name.
 
+Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, add a plus to the end, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab.
+
+## Build in Help
+
+You can add help comments in all scripts in ./scripts/, then, when you have a substring of a script, you can use `-h` to show only the help. Use `-hv` for extended help. To acomplish this you need to have lines that start with `#:` and the extended help lines need to start with `#+:`
+To show all help available, use a dot: `./evidencer . -h` 
+(you can switch the order of the parameters)
+
 ## Focus on one suit
-You can go into a suit, pull evidencer your way, and symlink that directory to your home for quick access, like so:
+You can go into a suit, pull evidencer your way by using a symlink, and symlink that suit directory to your home for quick access, like so:
 ```
 cd suits/mysuit
 ln -s ../../evidencer
