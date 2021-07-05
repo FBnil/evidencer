@@ -250,6 +250,7 @@ The configuration file contains many variables you can set. You can also define 
 | CFG Variable | What it does|
 |----|---|
 |BASEDIR| The directory where the `evidencer` binary is located|
+|CFGDIR| Configuration directory Defaults to `cfg`. Can only be defined in the toplevel configuration file (not inside suits). Can place your cfg files in a subdirectory of the SUIT, if you prefer that.|
 |TEMP| The directory where temporal files are created. Temporal files are needed when you use @hostnames_regexp, because we need a subset of servers from the content of the servergroup file. The default is a `./temp/` subdirectory where the evidencer script is located.
 |SUITSDIR|The directory where are the suit directories are in. The default is a `./suits/` subdirectory where the evidencer script is located.|
 |SUIT|Defaults to `..` this way, you do not need to worry about having a suit directory, you'll have `./servers/` and `./scripts/`here in the same directory evidencer resides|

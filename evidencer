@@ -21,7 +21,8 @@ my %BASECFG  = (
 	NEWLINE   => "\n",
 	SEPARATOR => "  ",
 	ARG       => "",
-	QUOTESTR  => "'"
+	QUOTESTR  => "'",
+	CFGDIR    => "cfg"
 );
 my $SUIT = $ENV{'SUIT'} || "";
 $SUIT = $1 if ( !$SUIT && getcwd() =~ m{/suits/(\w+)} );
@@ -108,10 +109,10 @@ sub readCFG
 			? $CFG{'SUITSDIR'} . '/' . $NEWSUIT . '/' . $name . '.cfg'
 			: $path . $name . '.cfg' );
 	-f $_CFGFILE
-		|| -f ( $_CFGFILE = $CFG{'SUITSDIR'} . '/' . $NEWSUIT . '/cfg/' . $name . '.cfg' )
+		|| -f ( $_CFGFILE = $CFG{'SUITSDIR'} .'/'. $NEWSUIT .'/'. $CFG{'CFGDIR'} .'/'. $name . '.cfg' )
 		|| -f ( $_CFGFILE = $path . $name . '.cfg' )
-		|| -f ( $_CFGFILE = $path . 'cfg/' . $name . '.cfg' )
-		|| -f ( $_CFGFILE = $path . '../cfg/' . $name . '.cfg' );
+		|| -f ( $_CFGFILE = $path . $CFG{'CFGDIR'} .'/'. $name . '.cfg' )
+		|| -f ( $_CFGFILE = $path . '../' . $CFG{'CFGDIR'} .'/'. $name . '.cfg' );
 
 	if ( -f $_CFGFILE ) {
 		$CFG{'CFGFILE'} = $_CFGFILE;
@@ -419,7 +420,7 @@ sub getscripts
 	readCFG($_)
 		if ( ( !$CFGFILE )
 		&& ( -f ( $_ = "$CFG{SUITSDIR}/$suit/$reg_scripts.cfg" ) 
-			|| -f ( $_ = "$CFG{SUITSDIR}/$suit/cfg/$reg_scripts.cfg" )) );
+			|| -f ( $_ = "$CFG{SUITSDIR}/$suit/$CFG{CFGDIR}/$reg_scripts.cfg" )) );
 	$CFG{'RUNSCRIPT'} = $reg_scripts; # make it available
 
 	# If we are using +, transform it to something glob can use to find servers
