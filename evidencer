@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case);
 Getopt::Long::Configure("bundling");
+BEGIN { $Pod::Usage::Formatter = 'Pod::Text::Termcap'; }
 use Pod::Usage;
 use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
@@ -890,9 +891,11 @@ __END__
 
 =head1 NAME
 
-evidencer.pl - A program to join servers and scripts
+evidencer.pl - A program to run scripts on servers
 
-=head1 SYNOPSIS
+For the full help, see README.md or directly on L<github|https://github.com/FBnil/evidencer>
+
+=head1 DIRECTORIES
 
  evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...>] [--help]
 
@@ -911,11 +914,190 @@ evidencer.pl - A program to join servers and scripts
 To create a suits directory structure:
 ./evidencer -C -s MYAPPL
 
+to create the top-level directories use the following command: 
+./evidencer -s .. -C
+
+Note: You can edit evidencer.cfg beforehand to redefine these directory names. See section CONFIGURATION
+
+=head1 CONFIGURATION Variables
+
+There are 3 level of configuration files: the toplevel, evidencer.cfg, then inside a suit, also
+named evidencer.cfg, and then per script, the name of the script up to the = and then .cfg
+
+
+=over 10
+
+=item B<BASEDIR>
+
+The directory where the evidencer binary is located
+
+=item B<CFGDIR>
+
+Configuration directory Defaults to cfg. Can only be defined in the toplevel configuration file (not inside suits). Can place your cfg files in a subdirectory of the SUIT, if you prefer that.
+
+      
+=item B<TEMP>
+
+The directory where temporal files are created. Temporal files are needed when you use @hostnames_regexp, because we need a subset of servers from the content of the servergroup file. The default is a ./temp/ subdirectory where the evidencer script is located.
+
+=item B<SUITSDIR>
+
+The directory where are the suit directories are in. The default is a ./suits/ subdirectory where the evidencer script is located.
+
+=item B<SUIT>
+
+Defaults to .. this way, you do not need to worry about having a suit directory, you'll have ./servers/ and ./scripts/here in the same directory evidencer resides
+
+=item B<SERVERS>
+
+If for some reason, you want the ./servers/ directory name to be different, you can override this name. The default is SERVERS=servers
+
+=item B<SCRIPTS>
+
+If for some reason, you want the ./scripts/ directory name to be different, you can override this name. For example, to use ssh-batch. That program uses inline as the directory name. The default is SCRIPTS=scripts
+
+=item B<RESULTS>
+
+Just a directory where the results are to be kept. The default is RESULTS=results
+
+=item B<ALIAS>
+
+You can define multiple aliases. The suit and the script in the commandline parameters are un-aliased. The hostnames_regexp is not. Example: ALIAS ES=ELASTICSEARCH
+
+
+=back
+
+
+=head1 RUN variables
+
+All variables that have to do with running found combinations of servers and scripts
+
+
+=over 13
+
+=item B<PID>
+
+The process ID of the currently running evidencer use it as: %{PID}. Combine with %{N} for unique filenames
+
+=item B<ARGV>
+
+The script+server combination we are running
+
+=item B<ARG>
+
+Contains the string with the argument(s) passed with -- or a single argument passed with -a
+
+=item B<N>
+
+A number that increases just before you use the: RUN_PRE, RUN and RUN_POST. Use it like: %{N}
+
+=item B<RUNSCRIPTSDIR>
+
+The directory where the scripts are located, basically: %{SUITSDIR}/%{SUIT}/%{SCRIPTS}
+
+=item B<RUNSERVERSDIR>
+
+The directory where the servergroups are located, basically: %{SUITSDIR}/%{SUIT}/%{SERVERS}
+
+=item B<RUNSUIT>
+
+The currently running suit
+
+=item B<RUNSCRIPT>
+
+The name of the scripts file being processed
+
+=item B<RUNSERVER>
+
+The name of the servers file being processed
+
+=item B<RUNSCRIPTFQ>
+
+Fully Qualified name for the scripts file, basically: %{RUNSCRIPTSDIR}/%{RUNSCRIPT}
+
+=item B<RUNSERVERFQ>
+
+Fully Qualified name for the servers file, basically: %{RUNSERVERSDIR}/%{RUNSERVER}
+
+=item B<RUNNAME>
+
+The name of the scripts file being processed %{RUNSCRIPT}, but stripped of the = and everything to the right
+
+=item B<RUNNAMES>
+
+If you --bundle or --fold you might want to use the + concated scripts names, instead of RUNNAME which will contain only the last one
+
+=item B<TEST>
+
+Argument string given with --test on the commandline (available as %{TEST}). It can be used in your RUN_PRE_TEST or RUN_TEST (and RUN_POST_TEST), which only activate when --test is used
+
+=item B<RUN_PRE_TEST>
+
+Execute this string in the shell to test the validity of the script+server combination. As with all *_TEST, Exit nonzero to skip execution of RUN_PRE and all after
+
+=item B<RUN_PRE>
+
+Execute this string in the shell. Runs before RUN. Time date strings are set before RUN_PRE and are the same for RUN and RUN_POST even if they take time to execute. Exit nonzero to skip.
+
+=item B<RUN_TEST>
+
+Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip RUN (but RUN_PRE already ran if it was defined)
+
+=item B<RUN>
+
+Execute this string in the shell
+
+=item B<RUN_POST>
+
+Execute this string in the shell. Runs after RUN
+
+=item B<KEEP>
+
+Set to true(1) to keep temporal files created when @hostnames is used
+
+=item B<RUN_START>
+
+Run just before the first RUN_PRE is ran. If no scripts+servers is matched, then this does not trigger either
+
+=item B<RUN_FINISH>
+
+Runs at the very end of the evidencer script, only if RUN_START ran
+
+=item B<RUN_BEGIN>
+
+This always runs at the beginning
+
+=item B<RUN_END>
+
+This always runs at the end. It has access to a number %{N} if it is zero, nothing actually ran
+
+=item B<ABORTMSG>
+
+The fatal errormessage will be available to RUN_ABORT to do something with it (for example:log it)
+
+=item B<RUN_ABORT>
+
+Execute this string in the shell when a fatal error occurred: When evidencer could not read or create a file it needs to run
+
+
+
+=back
+
+All RUN* commands have a *_FAIL counterpart. If the exitcode of the command is nonzero, then the *_FAIL will be run. The RUN_PRE is a special case: when RUN_PRE returns with a nonzero exitcode, then RUN_PRE_FAIL will also run, but then the rest, like RUN and RUN_POST will be skipped. To override this, end your RUN_PRE command with ;true.
+
+If you use arguments (either by adding a single argument with -a or using -- at the end of the parameters, and adding your parameter(s) after it; then, if you have defined: RUN_PRE_TEST_ARG, RUN_PRE_ARG, RUN_TEST_ARG, RUN_ARG, RUN_POST_TEST_ARG, RUN_POST_ARG Then those commands will be used instead. In both cases, %{ARG} will be available to be used.
+
+So the order is: RUN_BEGIN, RUN_START, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN_POST_TEST, RUN_POST, RUN_FINISH, RUN_END. and a *_FAIL f
+
+or each of these and a RUN_ABORT when file IO fails.
+
+
+
 =head1 OPTIONS
 
  [OPT         DESCRIPTION]
 
- -h | --help        Print Options and Arguments.
+ -h | --help | -?   Print Options and Arguments.
  --man              Print complete man page.
  -v | --verbose     Log more to the screen
  -D | --DEBUG       Log a bit more to the screen
@@ -935,6 +1117,8 @@ To create a suits directory structure:
  -S | --SEPARATOR $ The separation characters between folded and grouped items. (default is double space)
  -t | --test  <$>   Final test against a RUN (either before or after RUN_PRE) to validate the combination
  -s | --suit <suit> Only consider this suit for all script-server matches
+ -w | --warnings    Enable warnings when your script=server combination does not match anything. 
+                    Set WARNINGS=1 in the configuration file to enable it by default
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
