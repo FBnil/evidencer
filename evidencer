@@ -808,8 +808,14 @@ sub runit
 	my ( $KEY, $no_time_update ) = @_;
 	if ( $_ = $CFG{$KEY} ) {
 		updateTime( \%CFG ) unless $no_time_update;
-		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
-		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
+		if(index( $_, "%{" ) > -1){
+			xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) ;
+			xexpand( $_, '%\{(\w+)\}', \%CFG )
+		}
+		if(index( $_, "\${" ) > -1){
+			xexpand( $_, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' ) ;
+			xexpand( $_, '\$\{(\w+)\}', \%CFG, '$' )
+		}
 
 		if ( $CFG{'DRYRUN'} ) {
 			say "# RUN_BEGIN:\n" . $CFG{'RUN_BEGIN'}
@@ -845,10 +851,14 @@ sub globlize
 	$_[0] =~ s/\-$/-\*/g;                                        # if ends with -, then  -*
 }
 
-# xexpands %{} variables
+# xexpands %{} or ${} variables
 sub xexpand
 {
-	$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"%{$1}"/ge;
+	if($_[3]){
+		$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"\${$1}"/ge;
+	}else{
+		$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"%{$1}"/ge;
+	}
 	$_[0];
 }
 
