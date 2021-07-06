@@ -204,12 +204,25 @@ if($opt_help && @ARGV && !$opt_complete) {
 		++$K{$_} for grep { /$search/i } @methods; # search in names only
 	}
 
-	my $BOLD = "\033[1m";
-	my $NORM = "\033[0m";
+	my %COLOR = (
+		'B' => "\033[1m", # BOLD
+		'I' => "\033[3m", # ITALIC
+		'N' => "\033[0m", # Normal
+		'U' => "\033[4;37m", # UNDERLINE
+		'R' => "\033[1;31m", # RED
+		'G' => "\033[1;32m", # GREEN
+		'Y' => "\033[1;33m", # YELLOW
+		'L' => "\033[1;34m", # BLUE
+		'P' => "\033[1;35m", # PURPLE
+		'C' => "\033[1;36m", # CYAN
+		'Z' => "\033[7;1m", # INVERT
+		
+	);
 	for my $k (sort keys %K){
 		my ($title) = split /=/, $k;
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
-		say "\n=== ${BOLD}${title}${NORM} ===\n";
+		grep s/<([BRUINGLYPCZ])>(\S+)/$COLOR{$1}$2$COLOR{N}/g, @txt;
+		say "\n=== $COLOR{B}${title}$COLOR{N} ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
 		say "";
 	}
