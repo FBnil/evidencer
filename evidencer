@@ -102,6 +102,7 @@ sub readCFG
 			'_SELECTED_SUIT' => $NEWSUIT || $CFG{'SUIT'} || '..',
 			'ERRORCODE'      => 0,
 			'RUN_BEGAN'      => 0,
+			'CFGDIR'         => $BASECFG{'CFGDIR'},
 		)
 	);
 
@@ -170,9 +171,11 @@ sub readCFG
 	}
 }
 
-readCFG( $CFGFILE, $SUIT );
-say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
+readCFG( $CFGFILE ); # Read toplevel evidencer.cfg only for CFGDIR
+$BASECFG{'CFGDIR'} = $CFG{'CFGDIR'} if $CFG{'CFGDIR'} ne $BASECFG{'CFGDIR'};
+readCFG( $CFGFILE, $SUIT ) if $SUIT;
 %_CFG = UnDeepCopy( \%CFG );    # Backup real base configuration so each test can change it
+say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 
 # Help for the last argument given.
 # Add verbose: -hv  to also show the extra help #+: in the script
