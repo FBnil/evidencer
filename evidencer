@@ -23,7 +23,8 @@ my %BASECFG  = (
 	SEPARATOR => "  ",
 	ARG       => "",
 	QUOTESTR  => "'",
-	CFGDIR    => "cfg"
+	CFGDIR    => "cfg",
+	TOTALERRORS => 0
 );
 my $SUIT = $ENV{'SUIT'} || "";
 $SUIT = $1 if ( !$SUIT && getcwd() =~ m{/suits/(\w+)} );
@@ -93,12 +94,14 @@ sub readCFG
 		(
 			'BASEDIR'        => $BASEDIR,
 			'TEMP'           => $BASEDIR . "/tmp",
-			'SUITSDIR'        => $BASEDIR . "/suits",
+			'SUITSDIR'       => $BASEDIR . "/suits",
 			'SUIT'           => $NEWSUIT || $CFG{'SUIT'} || '..',
 			'SERVERS'        => 'servers',
 			'SCRIPTS'        => 'scripts',
 			'RESULTS'        => 'results',
 			'_SELECTED_SUIT' => $NEWSUIT || $CFG{'SUIT'} || '..',
+			'ERRORCODE'      => 0,
+			'RUN_BEGAN'      => 0,
 		)
 	);
 
@@ -124,6 +127,7 @@ sub readCFG
 			next if /^#/ || !/=/;
 			chomp;
 			s/\s+$//;
+			$_.=$_[0] while($_=~s/\\$// && chomp($_[0]=<$CFG>));
 			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/) {
 				$CFG{'ALIAS'}{$1} = $2;
 			} else {
@@ -138,18 +142,27 @@ sub readCFG
 		$CFG{$k} = $ENV{$k} if defined $ENV{$k};
 	}
 	if ( $CFG{REDEFINE} ) {
+		my $n=-1;
 		for my $redef ( @{ $CFG{'REDEFINE'} } ) {
+			++$n;
+			next unless $redef;
 			my $_redef = $redef;
 			if ( index( $redef, "=" ) == -1 ) {
 				if ( index( $redef, "," ) > -1 ) {
 					push @{ $CFG{'REDEFINE'} }, split /,/, $redef;
+					$CFG{'REDEFINE'}->[$n]=undef;
 					next;
 				}
 				$_redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 			}
+			if ( index( $_redef, "{,}" ) > -1 ) {
+				push @{ $CFG{'REDEFINE'} }, split /{,}/, $_redef;
+				$CFG{'REDEFINE'}->[$n]=undef;
+				next;
+			}
 			@_ = split "=", $_redef, 2;
 			say "# redef=($redef)" if $CFG{'DEBUG'};
-			if ( index( $_[1], "%{" ) > -1 ) {
+			if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
 				xexpand( $_[1], '%\{(\w+)\}', \%CFG );
 			}
 			$CFG{ $_[0] } = $_[1];
@@ -364,7 +377,7 @@ if ( $CFG{'CREATEDIRS'} ) {
 pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITSDIR'}\n" )
   unless -d $CFG{'SUITSDIR'};
 
-runit('RUN_BEGIN');
+runit('RUN_START');
 
 # Split argument string into suit, scripts and hoststr (suit:scripts=+:hoststr)
 sub getSuitAndScriptsAndHostStr
@@ -523,7 +536,17 @@ for my $argv (@ARGV) {
 		updateTime( \%CFG );
 		$CFG{N} += 1;    # simulate %{N} being set somewhat correctly.
 		for my $key ( sort keys %CFG ) {
-			say " \%{$key}=$CFG{$key}";
+			print " \%{$key}=";
+			if( $_ = ref($CFG{$key}) ){
+				if($_ eq "HASH"){
+					print join(", ", map { "$_ -> $CFG{$key}{$_}" } keys %{$CFG{$key}});
+				}elsif($_ eq "ARRAY"){
+					print join ":", @{$CFG{$key}}
+				}
+				say "";
+			}else{
+				say $CFG{$key};
+			}
 		}
 
 		for my $key1 ( sort keys %SCRIPT_FILES ) {
@@ -721,8 +744,8 @@ if ( !$CFG{'KEEP'} ) {
 	}
 }
 
-runit('RUN_FINISH') if $BASECFG{'RUN_STARTED'};
-runit('RUN_END');
+runit('RUN_END') if $BASECFG{'RUN_BEGAN'};
+runit('RUN_FINISH');
 exit 0;
 
 # Expand ALIAS variables in the parameters
@@ -752,7 +775,7 @@ sub executerun
 		say "# SCRIPT=$CFG{RUNSCRIPTFQ}";
 		say "# SERVER=$CFG{RUNSERVERFQ}";
 	}
-	$CFG{'N'} = $BASECFG{N} += 1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
+	$CFG{'N'} = $BASECFG{'N'} += 1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
 	my $EC;
 	my $REDO = defined $CFG{'REDO'} ? $CFG{'REDO'} : 0;
 	for my $run ( glob "{RUN}{_PRE,,_POST}{_TEST,}" ) {
@@ -787,24 +810,29 @@ sub runit
 		updateTime( \%CFG ) unless $no_time_update;
 		xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) if index( $_, "%{" ) > -1;
 		xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
+
 		if ( $CFG{'DRYRUN'} ) {
-			say "# RUN_START:\n" . $CFG{'RUN_START'}
-			  if ( defined $CFG{'RUN_START'} && !$BASECFG{'RUN_STARTED'}++ );
+			say "# RUN_BEGIN:\n" . $CFG{'RUN_BEGIN'}
+			  if ( defined $CFG{'RUN_BEGIN'} && !$BASECFG{'RUN_BEGAN'}++ );
 			say "# $KEY:\n" . $_;
 		} else {
-			if ( defined $CFG{'RUN_START'} && !$BASECFG{'RUN_STARTED'}++ ) {
-				say $CFG{'RUN_START'} if $CFG{'VERBOSE'};
-				system $CFG{'RUN_START'};
+			if ( $KEY ne 'RUN_START' && defined $CFG{'RUN_BEGIN'} && !$BASECFG{'RUN_BEGAN'}++ ) {
+				my $__ = $_;
+				$CFG{'_'}=$CFG{'RUN_BEGIN'};
+				$CFG{'__FAIL'}=$CFG{'RUN_BEGIN_FAIL'} if defined $CFG{'RUN_BEGIN_FAIL'};
+				runit('_',1);
+				delete @CFG{qw(_ __FAIL)};
+				$_ = $__;
 			}
 			say $_ if $CFG{'VERBOSE'};
 			my $ec = system $_;
 			say " # ExitCode=$?" if $CFG{'VERBOSE'};
-			$CFG{'ERRORCODE'} = $ec >> 8;
+			$CFG{'TOTALERRORS'} = $BASECFG{'TOTALERRORS'} += 1 if $CFG{'ERRORCODE'} = $ec >> 8;
 			runit( $KEY . "_FAIL", 1 ) if ( $ec && $KEY !~ /_FAIL$/ && $CFG{ $KEY . "_FAIL" } );
 			return $ec;
 		}
 	}
-	return 0;
+	return $CFG{'ERRORCODE'} = 0;
 }
 
 # transform lazy search into a glob-able pattern
@@ -820,7 +848,7 @@ sub globlize
 # xexpands %{} variables
 sub xexpand
 {
-	$_[0] =~ s/$_[1]/$_[2]{$1}?$_[2]{$1}:"%{$1}"/ge;
+	$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"%{$1}"/ge;
 	$_[0];
 }
 
@@ -855,7 +883,7 @@ sub readfiletoarray
 	while (<$FIN>) {
         next if defined $_filter && ! /$_filter/;
 		chomp;
-		if ($_recursed>-1 && /\//) {
+		if (defined($_recursed) && $_recursed>-1 && /\//) {
 			$CFG{'UNFOLDED'}++;    # signal that we unfolded
 			s{^\.}{%{SUITSDIR}/%{SUIT}/%{SERVERS}};
 			$_ = xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
@@ -990,7 +1018,8 @@ Contains the string with the argument(s) passed with -- or a single argument pas
 
 =item B<N>
 
-A number that increases just before you use the: RUN_PRE, RUN and RUN_POST. Use it like: %{N}
+A number that increases just before you use the: RUN_PRE, RUN and RUN_POST. Use it like: %{N}.
+If not using FOLD nor GROUP it's the number of scripts ran so far.
 
 =item B<RUNSCRIPTSDIR>
 
@@ -1058,17 +1087,17 @@ Set to true(1) to keep temporal files created when @hostnames is used
 
 =item B<RUN_START>
 
-Run just before the first RUN_PRE is ran. If no scripts+servers is matched, then this does not trigger either
-
-=item B<RUN_FINISH>
-
-Runs at the very end of the evidencer script, only if RUN_START ran
+This always runs at the beginning
 
 =item B<RUN_BEGIN>
 
-This always runs at the beginning
+Run just before the first RUN_PRE is ran. If no scripts+servers is matched, then this does not trigger
 
 =item B<RUN_END>
+
+Runs at the very end of each evidencer script, only if RUN_BEGIN ran (%{RUN_BEGAN} is nonzero)
+
+=item B<RUN_FINISH>
 
 This always runs at the end. It has access to a number %{N} if it is zero, nothing actually ran
 
@@ -1088,7 +1117,7 @@ All RUN* commands have a *_FAIL counterpart. If the exitcode of the command is n
 
 If you use arguments (either by adding a single argument with -a or using -- at the end of the parameters, and adding your parameter(s) after it; then, if you have defined: RUN_PRE_TEST_ARG, RUN_PRE_ARG, RUN_TEST_ARG, RUN_ARG, RUN_POST_TEST_ARG, RUN_POST_ARG Then those commands will be used instead. In both cases, %{ARG} will be available to be used.
 
-So the order is: RUN_BEGIN, RUN_START, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN_POST_TEST, RUN_POST, RUN_FINISH, RUN_END. and a *_FAIL f
+So the order is: RUN_START, RUN_BEGIN, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN_POST_TEST, RUN_POST, RUN_END, ...(next test)... RUN_FINISH. and a *_FAIL f
 
 or each of these and a RUN_ABORT when file IO fails.
 
