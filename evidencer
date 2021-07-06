@@ -829,7 +829,7 @@ sub runit
 			xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) ;
 			xexpand( $_, '%\{(\w+)\}', \%CFG )
 		}
-		if(index( $_, "\${" ) > -1){
+		if(index( $_, "\${" ) > -1 && !$CFG{'DRYRUN'}){
 			xexpand( $_, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' ) ;
 			xexpand( $_, '\$\{(\w+)\}', \%CFG, '$' )
 		}
