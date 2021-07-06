@@ -180,7 +180,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	my $better = $search=~s/\+//;
 	if($better){
 		for my $k (@methods){
-			++$K{$k} if readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",0,"#.*$search");
+			++$K{$k} if readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1,"#.*$search");
 		}
 		@methods = keys %K; # show help for all methods found with the searchterm
 	}else{
@@ -192,7 +192,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	my $NORM = "\033[0m";
 	for my $k (sort keys %K){
 		my ($title) = split /=/, $k;
-		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",0, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
+		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		say "\n=== ${BOLD}${title}${NORM} ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
 		say "";
@@ -844,6 +844,7 @@ sub updateTime
 	$v->{"TOTALTIME"} = time - $^T;                        # total seconds running
 }
 
+# use $_recursed=-1 to read verbatim
 sub readfiletoarray
 {
 	my ( $_file, $_recursed, $_filter ) = @_;
@@ -854,7 +855,7 @@ sub readfiletoarray
 	while (<$FIN>) {
         next if defined $_filter && ! /$_filter/;
 		chomp;
-		if (/\//) {
+		if ($_recursed>-1 && /\//) {
 			$CFG{'UNFOLDED'}++;    # signal that we unfolded
 			s{^\.}{%{SUITSDIR}/%{SUIT}/%{SERVERS}};
 			$_ = xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
