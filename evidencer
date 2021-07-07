@@ -197,6 +197,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	for my $k (sort keys %K){
 		my ($title) = split /=/, $k;
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
+		next unless @txt;
 		grep s/<([BRUINGLYPCAZ])>(\S+)/$COLOR{$1}$2$COLOR{N}/g, @txt;
 		say "\n=== $COLOR{B}${title}$COLOR{N} ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
