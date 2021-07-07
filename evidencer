@@ -249,10 +249,10 @@ if ($opt_complete)
 
 	$search = $_ARGV[ $ENV{'COMP_CWORD'} +1 ] || "";
 
+	# special case: SUIT
 	if($_ARGV[-1] eq '-s' && ($m>0)){
-		say "-s";exit;
+		say "-s"; exit;
 	}
-
 	if(($_ARGV[-1] eq '-s')||($_ARGV[-2] eq '-s' && (! -d $CFG{'SUITSDIR'}.'/'.$_ARGV[-1] || ($m>0)))){
 		my @suits = grep { -d "$CFG{'SUITSDIR'}/$_" } getdir($CFG{'SUITSDIR'} );
 		$search=$_ARGV[-1] eq '-s' ? '.' : $_ARGV[-1];
@@ -287,16 +287,11 @@ if ($opt_complete)
 		exit 0;
 	}
 
-	# Read all files in ./scripts/ that are methods (i.e. have the form: script=serverfilter and are executable)
-# 	use Data::Dumper;
-# 	my @UU= getdir(${SUITDIR}.$CFG{'SCRIPTS'});
-# 	open FF, '>>','log.log';
-# 	say FF Dumper \@UU;
-# 	close FF;
 	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
 
 	my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } getdir(${SUITDIR}.$CFG{'SERVERS'});
 
+	$search =~ s/[.]/\\./; # escape dot
 	if ( !$search ) {
 		# If we have nothing yet, suggest methods up until the first point (if they have)
 		my @M = @methods;
@@ -344,23 +339,23 @@ if ($opt_complete)
 					$a =~ s/=.*//;
 					$b =~ s/.*://;
 					$a =~ s/.*:// unless $k =~ /:/;
-					++$T{$a};
+					++$K{$a};
 					my $c = "$a=$b";
 					$c =~ s/^$k// if $k =~ /\-$/;
 					$c =~ s/.*=//
 					  if ( $realsearch !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] eq "=" )
 					  || $realsearch eq '=';
-					++$K{$c};
+					++$T{$c};
 				}
 			}
 		}
 	}
 
 	# if we have more than 1 test, only display testnames, else also with servernames
-	if ( scalar keys %T > 1 ) {
-		say join " ", sort keys %T;
-	} else {
+	if ( scalar keys %K > 1 ) {
 		say join " ", sort keys %K;
+	} else {
+ 		say join " ", sort keys %T;
 	}
 
 	exit;
