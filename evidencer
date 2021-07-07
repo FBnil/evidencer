@@ -11,6 +11,7 @@ use feature 'say';
 
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
+my %CFGSTOR;
 my %RICH;     # for forcing a new servergroup file
 my %CFG;      # Variable configuration
 my %_CFG;     # BASE configuration
@@ -142,32 +143,8 @@ sub readCFG
 	for my $k (qw(SUIT)) {
 		$CFG{$k} = $ENV{$k} if defined $ENV{$k};
 	}
-	if ( $CFG{REDEFINE} ) {
-		my $n=-1;
-		for my $redef ( @{ $CFG{'REDEFINE'} } ) {
-			++$n;
-			next unless $redef;
-			my $_redef = $redef;
-			if ( index( $redef, "=" ) == -1 ) {
-				if ( index( $redef, "," ) > -1 ) {
-					push @{ $CFG{'REDEFINE'} }, split /,/, $redef;
-					$CFG{'REDEFINE'}->[$n]=undef;
-					next;
-				}
-				$_redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
-			}
-			if ( index( $_redef, "{,}" ) > -1 ) {
-				push @{ $CFG{'REDEFINE'} }, split /{,}/, $_redef;
-				$CFG{'REDEFINE'}->[$n]=undef;
-				next;
-			}
-			@_ = split "=", $_redef, 2;
-			say "# redef=($redef)" if $CFG{'DEBUG'};
-			if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
-				xexpand( $_[1], '%\{(\w+)\}', \%CFG );
-			}
-			$CFG{ $_[0] } = $_[1];
-		}
+	if ( $CFG{'REDEFINE'} ) {
+		&redefine();
 	}
 }
 
@@ -512,12 +489,19 @@ sub getscripts
 for my $argv (@ARGV) {
 
 	# Should the argument have come quoted and is more than one, then split and add it to the loop
+	$argv = unalias($argv);
 	if ( index( $argv, ' ' ) > -1 ) {
 		push @ARGV, split / +/, $argv;
 		next;
 	}
 
 	say "Processing ARG: $argv" if $CFG{'VERBOSE'};
+
+	# Redefine commandline
+	if($argv=~s/^&//){
+		push @{$CFG{'REDEFINE'}}, $argv;
+		&redefine();
+	}
 
 	%CFG = UnDeepCopy( \%_CFG ) if $#ARGV;    # only restore if more than one test
 	my ( $suit, $scripts, $hoststr ) = getSuitAndScriptsAndHostStr($argv);
@@ -670,6 +654,7 @@ for my $argv (@ARGV) {
 
 			if ( $CFG{'FOLD'} || $CFG{'GROUP'} || $CFG{'BUNDLE'} ) {
 				$DEFER{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }++;
+				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }} = UnDeepCopy(\%CFG);
 			} else {
 				$CFG{'RUNNAMES'} = $CFG{'RUNNAME'};
 				&executerun();
@@ -752,6 +737,7 @@ if (%DEFER) {
 			my $server = $CFG{'RUNSERVERFQ'};
 			$script =~ s{$CFG{'RUNSCRIPTSDIR'}/}{}g;
 			$server =~ s{$CFG{'RUNSERVERSDIR'}/}{}g;
+			%CFG = %{$_} if defined ($_=$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} });
 			$CFG{'RUNSCRIPT'} = $script;
 			$CFG{'RUNSERVER'} = $server;
 			&executerun();
@@ -788,14 +774,14 @@ sub unalias
 
 sub executerun
 {
-	if ( $CFG{ARG} ) {
-		if ( ref $CFG{ARG} eq "ARRAY" ) {
-			$CFG{ARG} = join " ", @{ $CFG{ARG} };
+	if ( $CFG{'ARG'} ) {
+		if ( ref $CFG{'ARG'} eq "ARRAY" ) {
+			$CFG{'ARG'} = join " ", @{ $CFG{'ARG'} };
 		}
 	}
 	if ( $CFG{'VERBOSE'} ) {
 		say "# RUN($CFG{'ARGV'}) $CFG{RUNSUIT}:$CFG{RUNSCRIPT} on $CFG{RUNSERVER}"
-		  . ( $CFG{ARG} ? " with argument '$CFG{ARG}'" : "" );
+		  . ( $CFG{'ARG'} ? " with argument '$CFG{ARG}'" : "" );
 		say "# SCRIPT=$CFG{RUNSCRIPTFQ}";
 		say "# SERVER=$CFG{RUNSERVERFQ}";
 	}
@@ -957,6 +943,36 @@ sub getdir
 	my @list = grep {! /^\./} readdir($dh);
 	closedir $dh;
 	@list;
+}
+
+sub redefine
+{
+	my $n=-1;
+	for my $redef ( @{ $CFG{'REDEFINE'} } ) {
+		++$n;
+		$redef=~s/^\s+|\s+$//g; # trim
+		next unless $redef;
+		my $_redef = $redef;
+		if ( index( $redef, "=" ) == -1 ) {
+			if ( index( $redef, "," ) > -1 ) {
+				push @{ $CFG{'REDEFINE'} }, split /,/, $redef;
+				$CFG{'REDEFINE'}->[$n]=undef;
+				next;
+			}
+			$_redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+		}
+		if ( index( $_redef, "{,}" ) > -1 ) {
+			push @{ $CFG{'REDEFINE'} }, split /\s*{,}\s*/, $_redef;
+			$CFG{'REDEFINE'}->[$n]=undef;
+			next;
+		}
+		@_ = split "=", $_redef, 2;
+		say "# redef=($redef)" if $CFG{'DEBUG'};
+		if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
+			xexpand( $_[1], '%\{(\w+)\}', \%CFG );
+		}
+		$CFG{ $_[0] } = $_[1];
+	}
 }
 __END__
 
