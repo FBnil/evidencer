@@ -184,9 +184,7 @@ say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 if($opt_help && @ARGV && !$opt_complete) {
 	my $SUITDIR = $CFG{'SUITSDIR'}.'/'.$CFG{'SUIT'}.'/';
 	# Read all fils in ./scripts/ that are methods (i.e. have the form: script=serverfilter)
-	opendir( my $dh, ${SUITDIR}.$CFG{'SCRIPTS'} ) || die "Can't opendir ${SUITDIR}$CFG{'SCRIPTS'} $!";
-	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } readdir($dh);
-	closedir $dh;
+	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
 
 	my %K;
 	my $search = pop @ARGV; # only consider the last argument parameter given
@@ -256,9 +254,7 @@ if ($opt_complete)
 	}
 
 	if(($_ARGV[-1] eq '-s')||($_ARGV[-2] eq '-s' && (! -d $CFG{'SUITSDIR'}.'/'.$_ARGV[-1] || ($m>0)))){
-		opendir( my $dh, $CFG{'SUITSDIR'} ) || die "Can't opendir $CFG{'SUITSDIR'} $!";
-		my @suits = grep { ! /^\./ && -d "$CFG{'SUITSDIR'}/$_" } readdir($dh);
-		closedir $dh;
+		my @suits = grep { -d "$CFG{'SUITSDIR'}/$_" } getdir($CFG{'SUITSDIR'} );
 		$search=$_ARGV[-1] eq '-s' ? '.' : $_ARGV[-1];
 		@candidates = grep {/^$search/} @suits;
 		say join " ", @candidates;
@@ -292,13 +288,14 @@ if ($opt_complete)
 	}
 
 	# Read all files in ./scripts/ that are methods (i.e. have the form: script=serverfilter and are executable)
-	opendir( my $dh, ${SUITDIR}.$CFG{'SCRIPTS'} ) || die "Can't opendir ${SUITDIR}$CFG{'SCRIPTS'} $!";
-	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } readdir($dh);
-	closedir $dh;
+# 	use Data::Dumper;
+# 	my @UU= getdir(${SUITDIR}.$CFG{'SCRIPTS'});
+# 	open FF, '>>','log.log';
+# 	say FF Dumper \@UU;
+# 	close FF;
+	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
 
-	opendir( $dh, ${SUITDIR}.$CFG{'SERVERS'} ) || die "Can't opendir ${SUITDIR}$CFG{'SERVERS'} $!";
-	my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } readdir($dh);
-	closedir $dh;
+	my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } getdir(${SUITDIR}.$CFG{'SERVERS'});
 
 	if ( !$search ) {
 		# If we have nothing yet, suggest methods up until the first point (if they have)
@@ -462,6 +459,13 @@ sub getscripts
 	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n"
 		unless @REG_SCRIPTS || !$CFG{'WARNINGS'};
 
+	# support for last modified scripts file. test=#
+	my $last_only = 0;
+	if($reg_servers eq '#'){
+		$reg_servers = '*';
+		$last_only=1;
+	}
+
 	# Now, for the found scripts, check the servers part and match it against it's $reg_server
 	my $matches = 0;
 	for my $script (@REG_SCRIPTS) {
@@ -471,7 +475,14 @@ sub getscripts
 		globlize($reg_server);
 		say "For $script, search for servers: $reg_server in $serversdir argv:($argv)"
 		  if $CFG{'DEBUG'};
-		push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
+		if($last_only){
+			push( @REG_SERVERS, map basename($_->[0]),
+			sort { $b->[1] <=> $a->[1] } map [ $_, +(stat $_)[9] ],
+			grep $_ ne '.' && $_ ne '..', glob( $serversdir . '/' . $reg_server ) );
+			$scripts = $REG_SERVERS[0] || "";
+		}else{
+			push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
+		}
 		warn "No server files found that match $CFG{'SERVERS'}/$reg_server\n"
 		  unless @REG_SERVERS || !$CFG{'WARNINGS'};
 
@@ -779,6 +790,7 @@ sub unalias
 	return $str;
 }
 
+
 sub executerun
 {
 	if ( $CFG{ARG} ) {
@@ -942,6 +954,14 @@ sub UnDeepCopy
 	}
 
 	%COPY;
+}
+
+sub getdir
+{
+	opendir( my $dh, $_[0] ) || die "Can't opendir $_[0] $!";
+	my @list = grep {! /^\./} readdir($dh);
+	closedir $dh;
+	@list;
 }
 __END__
 
