@@ -25,8 +25,24 @@ my %BASECFG  = (
 	ARG       => "",
 	QUOTESTR  => "'",
 	CFGDIR    => "cfg",
-	TOTALERRORS => 0
+	TOTALERRORS => 0,
+	# COLORS
+	'C:'  => "\033[0m", # Normal
+	'C:N' => "\033[0m", # Normal
+	'C:B' => "\033[1m", # BOLD
+	'C:I' => "\033[3m", # ITALIC
+	'C:U' => "\033[4;37m", # UNDERLINE
+	'C:R' => "\033[1;31m", # RED
+	'C:G' => "\033[1;32m", # GREEN
+	'C:Y' => "\033[1;33m", # YELLOW
+	'C:L' => "\033[1;34m", # BLUE
+	'C:P' => "\033[1;35m", # PURPLE (officially Fuchsia/Magenta)
+	'C:C' => "\033[1;36m", # CYAN
+	'C:Z' => "\033[7;1m", # INVERT
+	'C:A' => "\033[0;90m", # GRAY
+	'C:O' => "\033[38;5;208m", # ORANGE (might not be available on all terminals)
 );
+
 my $SUIT = $ENV{'SUIT'} || "";
 $SUIT = $1 if ( !$SUIT && getcwd() =~ m{/suits/(\w+)} );
 
@@ -179,27 +195,14 @@ if($opt_help && @ARGV && !$opt_complete) {
 		++$K{$_} for grep { /$search/i } @methods; # search in names only
 	}
 
-	my %COLOR = (
-		'B' => "\033[1m", # BOLD
-		'I' => "\033[3m", # ITALIC
-		'N' => "\033[0m", # Normal
-		'U' => "\033[4;37m", # UNDERLINE
-		'R' => "\033[1;31m", # RED
-		'G' => "\033[1;32m", # GREEN
-		'Y' => "\033[1;33m", # YELLOW
-		'L' => "\033[1;34m", # BLUE
-		'P' => "\033[1;35m", # PURPLE
-		'C' => "\033[1;36m", # CYAN
-		'Z' => "\033[7;1m", # INVERT
-		'A' => "\033[0;90m", # GRAY
-		
-	);
 	for my $k (sort keys %K){
 		my ($title) = split /=/, $k;
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		next unless @txt;
-		grep s/<([BRUINGLYPCAZ])>(\S+)/$COLOR{$1}$2$COLOR{N}/g, @txt;
-		say "\n=== $COLOR{B}${title}$COLOR{N} ===\n";
+		grep s/<([BRUINGLYPCAZO])>(\S+)/$BASECFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
+		grep s/<(\d+)>(\S+)/\033[38;5;${1}m$2$BASECFG{'C:N'}/g, @txt; # <123>word
+		grep s/<(\d*):>/$1?"\033[38;5;${1}m":$BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>
+		say "\n=== $BASECFG{'C:B'}${title}$BASECFG{'C:N'} ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
 		say "";
 	}
@@ -554,7 +557,9 @@ for my $argv (@ARGV) {
 				}
 				say "";
 			}else{
-				say $CFG{$key};
+				my $v = $CFG{$key};
+				$v =~s/\033/\\033/g;
+				say $v;
 			}
 		}
 
@@ -822,7 +827,7 @@ sub runit
 		updateTime( \%CFG ) unless $no_time_update;
 		if(index( $_, "%{" ) > -1){
 			xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) ;
-			xexpand( $_, '%\{(\w+)\}', \%CFG )
+			xexpand( $_, '%\{([\w:]+)\}', \%CFG )
 		}
 		if(index( $_, "\${" ) > -1 && !$CFG{'DRYRUN'}){
 			xexpand( $_, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' ) ;
@@ -956,18 +961,22 @@ sub redefine
 		next unless $redef;
 		my $_redef = $redef;
 		if ( index( $redef, '=' ) == -1 ) {
+			# for: ./evidencer -r NORUN,NOPRE
 			if ( index( $redef, "," ) > -1 ) {
 				push @{ $CFG{'REDEFINE'} }, split /,/, $redef;
 				$CFG{'REDEFINE'}->[$n]=undef;
 				next;
 			}
+			# if no = to assign, then it must be an alias, substitute it.
 			$_redef =~ s/(?:^|\b)$_(?:\b|$)/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 		}
+		# different commands are split by {,}
 		if ( index( $_redef, "{,}" ) > -1 ) {
 			push @{ $CFG{'REDEFINE'} }, split /\s*{,}\s*/, $_redef;
 			$CFG{'REDEFINE'}->[$n]=undef;
 			next;
 		}
+		# now they are in the form: variable=value, split and assign to %CFG
 		@_ = split /=/, $_redef, 2;
 		say "# redef=($redef)" if $CFG{'DEBUG'};
 		if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {

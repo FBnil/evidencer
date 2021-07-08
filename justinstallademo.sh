@@ -94,8 +94,14 @@ for t in a.spoon a.fork the.knife ;do
 	echo -e "#+: <Y>Usage: <L>./evidencer <L>get.${t}=# \n" >> $s
 	echo -e "#+:\n" >> $s
 	echo -e "#+: You can use the following text accents:\n" >> $s
-	echo -e "#+: <B>BOLD <I>ITALIC <N>Normal <U>UNDERLINE <R>RED <G>GREEN <Y>YELLOW \n" >> $s
-	echo -e "#+: <L>BLUE <P>PURPLE <C>CYAN <Z>INVERT <A>GRAY	\n" >> $s
+	echo -e "#+: <B><B>BOLD <I><I>ITALIC <N><N>Normal <U><U>UNDERLINE <R><R>RED <G><G>GREEN <Y><Y>YELLOW\n" >> $s
+	echo -e "#+: <L><L>BLUE <P><P>PURPLE <C><C>CYAN <Z><Z>INVERT <A><A>GRAY <O><O>ORANGE\n" >> $s
+	echo -e "#+: You can also use numerical values:\n" >> $s
+	echo -e "#+: <165><165>Magenta2 <140><140>MediumPurple2 <99><99>SlateBlue1 <236><236>Grey19 <070><070>Chartreuse3\n" >> $s
+	echo -e "#+: Look up colorscodes by name on the web:\n" >> $s
+	echo -e "#+: <Y>URL: https://jonasjacek.github.io/colors/\n" >> $s
+	echo -e "#+: Look up colorcodes on the terminal:\n" >> $s
+	echo -e "#+: <Y>URL: <77:>https://www.perturb.org/code/term-colors.pl<:>\n" >> $s
 done
 
 cat << 'EOF' > scripts/header=+
