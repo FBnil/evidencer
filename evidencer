@@ -502,6 +502,7 @@ for my $argv (@ARGV) {
 	if($argv=~s/^&//){
 		push @{$CFG{'REDEFINE'}}, $argv;
 		&redefine();
+		next;
 	}
 
 	%CFG = UnDeepCopy( \%_CFG ) if $#ARGV;    # only restore if more than one test
@@ -764,10 +765,10 @@ sub unalias
 	my ($str) = @_;
 	if ( index( $str, '@' ) > -1 ) {
 		my ( $expr1, $expr2 ) = split( '@', $str, 2 );
-		$expr1 =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+		$expr1 =~ s/(?:^|\b)$_(?:\b|$)/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 		$str = $expr1 . '@' . $expr2;
 	} else {
-		$str =~ s/(?:\b|^)$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+		$str =~ s/(?:^|\b)$_(?:\b|$)/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 	}
 	return $str;
 }
@@ -960,7 +961,7 @@ sub redefine
 				$CFG{'REDEFINE'}->[$n]=undef;
 				next;
 			}
-			$_redef =~ s/\b$_\b/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
+			$_redef =~ s/(?:^|\b)$_(?:\b|$)/$CFG{'ALIAS'}{$_}/g for keys %{ $CFG{'ALIAS'} };
 		}
 		if ( index( $_redef, "{,}" ) > -1 ) {
 			push @{ $CFG{'REDEFINE'} }, split /\s*{,}\s*/, $_redef;
