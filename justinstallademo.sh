@@ -27,13 +27,13 @@ $MERGE && install bin/* ~/bin || chmod +x bin/*
 
 
 if [ ! -f ~/.ssh/askpass.vault ];then
-echo "Setting up a ssh-batch vault"
-echo "You will need to type in your password twice (once for $USER, and once for default, then"
-echo "Twice your vault password. Use dummy values if you do not have remote servers to test to."
-echo "although ssh'ing to server 127.0.0.1 works"
-~/bin/ssh_askpass --vault-create $USER ""
+	echo "Setting up a ssh-batch vault"
+	echo "You will need to type in your password twice (once for $USER, and once for default, then"
+	echo "Twice your vault password. Use dummy values if you do not have remote servers to test to."
+	echo "although ssh'ing to server 127.0.0.1 works"
+	~/bin/ssh_askpass --vault-create $USER ""
 else
-echo "You already seem to have an ~/.ssh/askpass.vault . Skipping creation."
+	echo "You already seem to have an ~/.ssh/askpass.vault . Skipping creation."
 fi
 
 echo "Setting up commandline completion for evidencer"
@@ -46,7 +46,7 @@ BASHRC=~/.bashrc
 grep -q completion_for_evidencer $BASHRC
 
 if [ $? = 0 ];then
-echo "You already have tab completion in your $BASHRC . Skipping."
+	echo "You already have tab completion in your $BASHRC . Skipping."
 else
 
 cat << 'EOF' >> $BASHRC
