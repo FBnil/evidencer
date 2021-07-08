@@ -22,7 +22,7 @@ my %BASECFG  = (
 	UTC       => 0,
 	NEWLINE   => "\n",
 	SEPARATOR => "  ",
-	ARG       => "",
+	ARG       => undef,
 	QUOTESTR  => "'",
 	CFGDIR    => "cfg",
 	TOTALERRORS => 0,
@@ -661,7 +661,8 @@ for my $argv (@ARGV) {
 
 			if ( $CFG{'FOLD'} || $CFG{'GROUP'} || $CFG{'BUNDLE'} ) {
 				$DEFER{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }++;
-				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }} = UnDeepCopy(\%CFG);
+				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }} = UnDeepCopy(\%CFG) unless $CFG{'GROUP'};
+				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{'_'}} = UnDeepCopy(\%CFG);
 			} else {
 				$CFG{'RUNNAMES'} = $CFG{'RUNNAME'};
 				&executerun();
@@ -694,11 +695,10 @@ if (%DEFER) {
 			$DEFER{$str}{$k} = 1;
 		}
 	}
-
 	$CFG{'RUNNAMES'} = join '+', grep { s{.*/}{}; s{=.*}{}; } sort keys %DEFER;
 
 	for my $scripts ( sort keys %DEFER ) {
-		$CFG{RUNSCRIPTFQ} = $scripts;
+		$CFG{'RUNSCRIPTFQ'} = $scripts;
 		for my $servers ( sort keys %{ $DEFER{$scripts} } ) {
 			$CFG{'RUNSERVERFQ'} = $servers;
 
@@ -740,13 +740,18 @@ if (%DEFER) {
 				}
 			}
 
+			my $scriptfq = $CFG{'RUNSCRIPTFQ'};
+			my $serverfq = $CFG{'RUNSERVERFQ'};
 			my $script = $CFG{'RUNSCRIPTFQ'};
 			my $server = $CFG{'RUNSERVERFQ'};
 			$script =~ s{$CFG{'RUNSCRIPTSDIR'}/}{}g;
 			$server =~ s{$CFG{'RUNSERVERSDIR'}/}{}g;
-			%CFG = %{$_} if defined ($_=$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} });
+			%CFG = %{$_} if defined ($_=$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }) 
+				|| defined ($_=$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ '_' });
 			$CFG{'RUNSCRIPT'} = $script;
 			$CFG{'RUNSERVER'} = $server;
+			$CFG{'RUNSCRIPTFQ'} = $scriptfq;
+			$CFG{'RUNSERVERFQ'} = $serverfq;
 			&executerun();
 		}
 	}
@@ -982,7 +987,11 @@ sub redefine
 		if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
 			xexpand( $_[1], '%\{(\w+)\}', \%CFG );
 		}
-		$CFG{ $_[0] } = $_[1];
+		if($_[0]=~s/!$//){
+			++$DONOTOVERRIDE{ $_[0] };
+			# $BASECFG{ $_[0] } = $_[1]; 
+		}
+		$_CFG{ $_[0] } = $CFG{ $_[0] } = $_[1];
 	}
 }
 __END__
