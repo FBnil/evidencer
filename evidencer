@@ -133,7 +133,7 @@ sub readCFG
 			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/) {
 				$CFG{'ALIAS'}{$1} = $2;
 			} else {
-				my ( $k, $v ) = split '=', $_, 2;
+				my ( $k, $v ) = split /=/, $_, 2;
 				$v = xexpand( $v, '%\{(\w+)\}', \%CFG ) if index( $v, "%{" ) > -1;
 				$v = abs_path($v) if $DIRS{$k};
 				$CFG{$k} = $v unless $DONOTOVERRIDE{$k} && defined $CFG{$k};
@@ -279,7 +279,7 @@ if ($opt_complete)
 			say join " ", @candidates;
 			exit ;
 		}
-	} elsif ( $search !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] ne "=" ) {
+	} elsif ( $search !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] ne '=' ) {
 		my @M = @methods;
 		if($search=~s/\+/.*/g){
 			++$K{$_} for grep { /$search/ } @M;
@@ -288,9 +288,9 @@ if ($opt_complete)
 		}
 		@candidates = keys %K;
 	}
-	if ((@ARGV && $_ARGV[ $ENV{'COMP_CWORD'} ] eq "=") || $search eq "=" ) {
+	if ((@ARGV && $_ARGV[ $ENV{'COMP_CWORD'} ] eq '=') || $search eq '=' ) {
 		$search =
-			$search eq "="
+			$search eq '='
 			? $_ARGV[ $ENV{'COMP_CWORD'} ] . '=+'
 			: $_ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=' . $search;
 		@candidates = ( $search . '*' );
@@ -321,7 +321,7 @@ if ($opt_complete)
 					my $c = "$a=$b";
 					$c =~ s/^$k// if $k =~ /\-$/;
 					$c =~ s/.*=//
-					  if ( $realsearch !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] eq "=" )
+					  if ( $realsearch !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] eq '=' )
 					  || $realsearch eq '=';
 					++$T{$c};
 				}
@@ -414,7 +414,7 @@ sub getscripts
 		|| pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $serversdir\n" );
 
 	# Isolate the $reg_scripts, there might be a configuration file for it
-	my ( $reg_scripts, $reg_servers ) = split "=", $scripts, 2;
+	my ( $reg_scripts, $reg_servers ) = split /=/, $scripts, 2;
 
 	# Read the config for the test, if it exists (merges configuration with existing).
 	# Bug: when multiple inlines are run, then it does not clean up the cfg from prev.
@@ -443,7 +443,7 @@ sub getscripts
 	my $matches = 0;
 	for my $script (@REG_SCRIPTS) {
 		@REG_SERVERS = ();
-		my ( $reg_script, $reg_server ) = split "=", $script, 2;
+		my ( $reg_script, $reg_server ) = split /=/, $script, 2;
 		next unless $reg_server;    # skip files that do not have servergroup candidates
 		globlize($reg_server);
 		say "For $script, search for servers: $reg_server in $serversdir argv:($argv)"
@@ -522,7 +522,7 @@ for my $argv (@ARGV) {
 	if ( !$CFG{'NOAUTOFIX'} ) {
 		my %TEST2SCRIPT;
 		for my $suitscript ( sort keys %SCRIPT_FILES ) {
-			my ( $test, $server ) = split "=", $suitscript, 2;
+			my ( $test, $server ) = split /=/, $suitscript, 2;
 			push @{ $TEST2SCRIPT{$test} }, $suitscript;
 		}
 		for my $test ( sort keys %TEST2SCRIPT ) {
@@ -639,9 +639,9 @@ for my $argv (@ARGV) {
 					push @{ $CFG{'_CLEANUP'} }, ( $CFG{'RUNSERVERFQ'} = $CFG{'TEMP'} . '/' . $tempfile );
 					$CFG{'RUNSERVERSDIR'} = $CFG{'TEMP'};
 					$CFG{'RUNSERVER'} = $server = $tempfile;
-					open( FOUT, '>', $CFG{'RUNSERVERFQ'} ) or abort("$CFG{RUNSERVERFQ}: $!");
-					say FOUT $_ for @servers;
-					close FOUT;
+					open( my $FOUT, '>', $CFG{'RUNSERVERFQ'} ) or abort("$CFG{RUNSERVERFQ}: $!");
+					say $FOUT $_ for @servers;
+					close $FOUT;
 				}
 			}
 
@@ -707,12 +707,12 @@ if (%DEFER) {
 					say "# BUNDLING SCRIPTS $scripts" if $CFG{'VERBOSE'};
 					$CFG{'RUNSCRIPTSDIR'} = $CFG{'TEMP'};
 					$CFG{'RUNSCRIPT'}     = $tempfile;
-					open( FOUT, '>', $CFG{'RUNSCRIPTFQ'} ) or abort("$CFG{RUNSCRIPTFQ}: $!");
+					open( my $FOUT, '>', $CFG{'RUNSCRIPTFQ'} ) or abort("$CFG{RUNSCRIPTFQ}: $!");
 					for my $file ( split /$CFG{'SEPARATOR'}/, $scripts ) {
 						say "## BUNDLING SCRIPT $file" if $CFG{'DEBUG'};
-						say FOUT $_ for readfiletoarray($file);
+						say $FOUT $_ for readfiletoarray($file);
 					}
-					close FOUT;
+					close $FOUT;
 				}
 
 				if ( index( $servers, $CFG{'SEPARATOR'} ) > -1 ) {
@@ -725,12 +725,12 @@ if (%DEFER) {
 					say "# BUNDLING SERVERS $servers" if $CFG{'VERBOSE'};
 					$CFG{'RUNSERVERSDIR'} = $CFG{'TEMP'};
 					$CFG{'RUNSERVER'}     = $tempfile;
-					open( FOUT, '>', $CFG{'RUNSERVERFQ'} ) or abort("$CFG{RUNSERVERFQ}: $!");
+					open( my $FOUT, '>', $CFG{'RUNSERVERFQ'} ) or abort("$CFG{RUNSERVERFQ}: $!");
 					for my $file ( split /$CFG{SEPARATOR}/, $servers ) {
 						say "## BUNDLING SERVER $file" if $CFG{'DEBUG'};
-						say FOUT $_ for readfiletoarray($file);
+						say $FOUT $_ for readfiletoarray($file);
 					}
-					close FOUT;
+					close $FOUT;
 				}
 			}
 
@@ -954,7 +954,7 @@ sub redefine
 		$redef=~s/^\s+|\s+$//g; # trim
 		next unless $redef;
 		my $_redef = $redef;
-		if ( index( $redef, "=" ) == -1 ) {
+		if ( index( $redef, '=' ) == -1 ) {
 			if ( index( $redef, "," ) > -1 ) {
 				push @{ $CFG{'REDEFINE'} }, split /,/, $redef;
 				$CFG{'REDEFINE'}->[$n]=undef;
@@ -967,7 +967,7 @@ sub redefine
 			$CFG{'REDEFINE'}->[$n]=undef;
 			next;
 		}
-		@_ = split "=", $_redef, 2;
+		@_ = split /=/, $_redef, 2;
 		say "# redef=($redef)" if $CFG{'DEBUG'};
 		if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
 			xexpand( $_[1], '%\{(\w+)\}', \%CFG );
@@ -1239,7 +1239,7 @@ Options can be anywhere in the commandline (but not after the `--` parameter). O
 
  @hostnames regexp's are not un-ALIAS-ed.
 
-=head1 LICENSE
+=head1 LICENSE AND COPYRIGHT
 
 This software is released under the Unlicense statement.
 It is free and unencumbered software released into the public domain.
