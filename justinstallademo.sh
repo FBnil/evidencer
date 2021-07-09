@@ -102,6 +102,8 @@ for t in a.spoon a.fork the.knife ;do
 	echo -e "#+: <Y>URL: https://jonasjacek.github.io/colors/\n" >> $s
 	echo -e "#+: Look up colorcodes on the terminal:\n" >> $s
 	echo -e "#+: <Y>URL: <77:>https://www.perturb.org/code/term-colors.pl<:>\n" >> $s
+	echo -e "#+: To mark long use < B: > <B:>with the end tag <:> < : >" >> $s
+	echo -e "#+: All while leaving normal <xml> ... </xml> tags intact." >> $s
 done
 
 cat << 'EOF' > scripts/header=+

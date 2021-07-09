@@ -41,6 +41,7 @@ my %BASECFG  = (
 	'C:Z' => "\033[7;1m", # INVERT
 	'C:A' => "\033[0;90m", # GRAY
 	'C:O' => "\033[38;5;208m", # ORANGE (might not be available on all terminals)
+	NOCOLORS => undef, # set to 1 in the evidencer.cfg file to disable colored help
 );
 
 my $SUIT = $ENV{'SUIT'} || "";
@@ -199,9 +200,10 @@ if($opt_help && @ARGV && !$opt_complete) {
 		my ($title) = split /=/, $k;
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		next unless @txt;
+		grep s/<(?:.|\d+):?>//g, @txt if $CFG{'NOCOLORS'};
 		grep s/<([BRUINGLYPCAZO])>(\S+)/$BASECFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
+		grep s/<(\w*):>/ $1 ? ( $1>0 ? "\033[38;5;${1}m" : "$BASECFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>
 		grep s/<(\d+)>(\S+)/\033[38;5;${1}m$2$BASECFG{'C:N'}/g, @txt; # <123>word
-		grep s/<(\d*):>/$1?"\033[38;5;${1}m":$BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>
 		say "\n=== $BASECFG{'C:B'}${title}$BASECFG{'C:N'} ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
 		say "";
