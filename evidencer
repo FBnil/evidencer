@@ -41,7 +41,7 @@ my %BASECFG  = (
 	'C:Z' => "\033[7;1m", # INVERT
 	'C:A' => "\033[0;90m", # GRAY
 	'C:O' => "\033[38;5;208m", # ORANGE (might not be available on all terminals)
-	NOCOLORS => undef, # set to 1 in the evidencer.cfg file to disable colored help
+	NOCOLORS => 0, # set to 1 in the evidencer.cfg file to disable colored help
 );
 
 my $SUIT = $ENV{'SUIT'} || "";
@@ -196,6 +196,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 		++$K{$_} for grep { /$search/i } @methods; # search in names only
 	}
 
+	{ no warnings;
 	for my $k (sort keys %K){
 		my ($title) = split /=/, $k;
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
@@ -204,22 +205,21 @@ if($opt_help && @ARGV && !$opt_complete) {
 		grep s/<([BRUINGLYPCAZO])>(\S+)/$BASECFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
 		grep s/<(\w*):>/ $1 ? ( $1>0 ? "\033[38;5;${1}m" : "$BASECFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>
 		grep s/<(\d+)>(\S+)/\033[38;5;${1}m$2$BASECFG{'C:N'}/g, @txt; # <123>word
-		say "\n=== " . ($CFG{'NOCOLORS'}? '':$BASECFG{'C:B'}) . "${title}" . ($CFG{'NOCOLORS'}? '':$BASECFG{'C:N'}) . " ===\n";
+		say "\n=== " . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:B'}) . "${title}" . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:N'}) . " ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
 		say "";
+	}
 	}
 
 	exit 0;
 }
 
 # Completions
-# USAGE:
 #
-# # if [[ "${-}" =~ 'i' ]];then  #Uncomment to not load when running non-interactively
+# #if [[ "${-}" =~ 'i' ]];then  #Uncomment to not load when running non-interactively
 # function _getopt_complete () {
 #  COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` --complete ${COMP_WORDS[@]:0} ));
 # }
-#
 # complete -F _getopt_complete evidencer
 # # fi
 #
@@ -1006,11 +1006,43 @@ evidencer.pl - A program to run scripts on servers
 
 For the full help, see README.md or directly on L<github|https://github.com/FBnil/evidencer>
 
-=head1 DIRECTORIES
-
- evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...>] [--help]
-
 =head1 DESCRIPTION
+
+ evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...|#n>] [--help] [--man]
+ 
+ 
+ Example:
+
+ # Run, from the suit JAVATRANSACTIONS the test JAVASERVER-SERVICES= for servers JAVA-ET
+ # that match the perl regexp javaserver00[1..5] or the substring javaserver0100
+ ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
+
+ # show (dryrun) what would run from the suit JAVATRANSACTIONS the test
+ # JAVASERVER-SERVICES= for any matching servers AND the test JAVASERVER-PORTS for any of it's
+ # matching servers
+ ./evidencer -s JAVATRANSACTIONS JAVASERVER-SERVICES=* JAVASERVER-PORTS -d
+
+ JAVASERVER-SERVICES=* can be written as:
+   JAVASERVER-SERVICES=  or as  JAVASERVER-SERVICES=+  or even as  JAVASERVER-SERVICES
+
+ The servergroup part of a script name, uses a plus sign instead of an asterix, and these are the transformation rules:
+ +     ==>  *       ++    ==>  *-*     +-+-+ ==>  *-*-*
+ +A    ==>  *A      A+    ==>  A*      ++B   ==>  *-B
+ +-A   ==>  *-A     A-+   ==>  A-*     A++   ==>  A-*
+ A++B  ==>  A-*-B   A-+B  ==>  A-*B    A+-B  ==>  A*-B
+
+ So if you have a servergroup called APACHE-PROD-DMZ, then =++DMZ would match that group.
+ And ++PROD++  would match *-PROD-*. These are glob expansions, which means it would match
+ exactly what ls would match if you run:  ls ./servers/*-PROD-*
+
+ If unsure, escape or quote your servergroup and use dryrun.
+
+ @hostnames regexp's are not un-ALIAS-ed.
+ 
+ You must have a configuration file that tells evidencer what to do with the script and the servergroup. So it at least needs a RUN= statement in that configuration file.
+
+
+=head1 DIRECTORIES
 
 ./servers/  Define a list of server by function.
 
@@ -1022,11 +1054,13 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
 
 ./tmp/      A temporal directory to hold sub lists of servergroups when using hostnames_regexp
 
-To create a suits directory structure:
-./evidencer -C -s MYAPPL
-
 to create the top-level directories use the following command: 
+
 ./evidencer -s .. -C
+
+To create a suits directory structure:
+
+./evidencer -C -s MYAPPL
 
 Note: You can edit evidencer.cfg beforehand to redefine these directory names. See section CONFIGURATION
 
@@ -1234,33 +1268,39 @@ or each of these and a RUN_ABORT when file IO fails.
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
- Example:
+=head1 SCRIPTS HELP
 
- # Run, from the suit JAVATRANSACTIONS the test JAVASERVER-SERVICES= for servers JAVA-ET
- # that match the perl regexp javaserver00[1..5] or the substring javaserver0100
- ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
+The scripts can have lines that start with #: (vieable with -h) or #+: (vieable with -hv)
+For example:
+./evidencer spoon -hv
 
- # show (dryrun) what would run from the suit JAVATRANSACTIONS the test
- # JAVASERVER-SERVICES= for any matching servers AND the test JAVASERVER-PORTS for any of it's
- # matching servers
- ./evidencer -s JAVATRANSACTIONS JAVASERVER-SERVICES=* JAVASERVER-PORTS -d
+If you are making your own help text inside scripts, then you can add colors with <C>, 
+where C is a character, or a number. The available characters are viewable with:
+B<grep C: evidencer |grep 033 |grep =>
 
- JAVASERVER-SERVICES=* can be written as:
-   JAVASERVER-SERVICES=  or as  JAVASERVER-SERVICES=+  or even as  JAVASERVER-SERVICES
+If you do not want colors, use NOCOLORS, like so:
 
- The servergroup, can use a plus sign instead of an asterix, and these are the rules:
- +     ==>  *       ++    ==>  *-*     +-+-+ ==>  *-*-*
- +A    ==>  *A      A+    ==>  A*      ++B   ==>  *-B
- +-A   ==>  *-A     A-+   ==>  A-*     A++   ==>  A-*
- A++B  ==>  A-*-B   A-+B  ==>  A-*B    A+-B  ==>  A*-B
+./evidencer . -hv -r NOCOLORS=2
 
- So if you have a servergroup called APACHE-PROD-DMZ, then =++DMZ would match that group.
- And ++PROD++  would match *-PROD-*. These are glob expansions, which means it would match
- exactly what ls would match if you run:  ls ./servers/*-PROD-*
+You can put this variable also in your evidencer.cfg file:
 
- If unsure, escape or quote your servergroup and use dryrun.
+# NOCOLORS=     # default. Display help with colors
 
- @hostnames regexp's are not un-ALIAS-ed.
+# NOCOLORS=1    # Only headers are bold, the rest is monochromatic
+
+# NOCOLORS=2    # fully monochromatic, useful for storing in a text file.
+
+=head1 TAB EXPANSION
+
+You can activate tab expansion for evidencer by putting the following in your ~/.bashrc:
+
+grep -A7  '^# Completions'  evidencer | sed -e '1,2d;s/^..//'
+
+(and when you do that for the first time, source your bashrc first, or open a new terminal)
+
+Tip: the newest file in ./servers/ is aliased to #, so to run a script on all the server in that latest file:
+
+./evidencer os.show.boottime=#
 
 =head1 LICENSE AND COPYRIGHT
 
