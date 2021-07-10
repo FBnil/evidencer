@@ -216,21 +216,26 @@ if($opt_help && @ARGV && !$opt_complete) {
 
 # Completions
 #
-# #if [[ "${-}" =~ 'i' ]];then  #Uncomment to not load when running non-interactively
-# function _getopt_complete () {
-#  COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` --complete ${COMP_WORDS[@]:0} ));
-# }
-# complete -F _getopt_complete evidencer
-# # fi
+## # if [[ "${-}" =~ 'i' ]];then  #Uncomment to not load when running non-interactively
+## function _getopt_complete () {
+##  COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` --complete ${COMP_WORDS[@]:0} ));
+## };
+## complete -F _getopt_complete evidencer
+## # fi
 #
 if ($opt_complete)
 {
+	# print completion code
+	unless($ENV{'COMP_CWORD'}){
+		say join "\n", grep { s/## // && !/# / } readfiletoarray($0, -1, '^##');
+		exit
+	};
 	my $SUITDIR = $CFG{'SUITSDIR'}.'/'.$CFG{'SUIT'}.'/';
 
 	my $search = "";
 	my @candidates;
 	my %K;
-	my $m = $#_ARGV - $ENV{COMP_CWORD};
+	my $m = $#_ARGV - $ENV{'COMP_CWORD'};
 
 	$search = $_ARGV[ $ENV{'COMP_CWORD'} +1 ] || "";
 
@@ -1294,9 +1299,13 @@ You can put this variable also in your evidencer.cfg file:
 
 You can activate tab expansion for evidencer by putting the following in your ~/.bashrc:
 
-grep -A7  '^# Completions'  evidencer | sed -e '1,2d;s/^..//'
+./evidencer --complete >> ~/.bashrc
 
 (and when you do that for the first time, source your bashrc first, or open a new terminal)
+
+If you do not want to change your .bashrc, then run this to get tab expansion in your current terminal:
+
+eval $(./evidencer --complete) 
 
 Tip: the newest file in ./servers/ is aliased to #, so to run a script on all the server in that latest file:
 
