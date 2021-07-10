@@ -227,7 +227,7 @@ if ($opt_complete)
 {
 	# print completion code
 	unless($ENV{'COMP_CWORD'}){
-		say join "\n", grep { s/## // && !/# / } readfiletoarray($0, -1, '^##');
+		say join "\n", grep { s/## // && (!/-F/ || (@ARGV?s/\w+$/$ARGV[0]/:s/\w+$/basename($0)/e)) && !/# / } readfiletoarray($0, -1, '^##');
 		exit
 	};
 	my $SUITDIR = $CFG{'SUITSDIR'}.'/'.$CFG{'SUIT'}.'/';
@@ -1305,7 +1305,12 @@ You can activate tab expansion for evidencer by putting the following in your ~/
 
 If you do not want to change your .bashrc, then run this to get tab expansion in your current terminal:
 
-eval $(./evidencer --complete) 
+eval $(./evidencer --complete)
+
+Sometimes expansion does not work, check that there is no other expansion for the binary defined:
+
+`complete |grep evidencer` and delete it with `complete -r evidencer` then try again.
+
 
 Tip: the newest file in ./servers/ is aliased to #, so to run a script on all the server in that latest file:
 

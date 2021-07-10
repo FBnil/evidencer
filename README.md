@@ -558,6 +558,10 @@ If you do not want to change your .bashrc, then run this to get tab expansion in
 
 `eval $(./evidencer --complete)`
 
+Sometimes expansion does not work, check that there is no other expansion for the binary defined:
+
+`complete |grep evidencer` and delete it with `complete -r evidencer` then try again.
+
 tip: Make sure your ./scripts/ are executable (chmod +x) and have a '=' sign in their name.
 
 Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, add a plus to the end, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab, and if it's the only suggestion, then that is expanded in one go.
