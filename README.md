@@ -13,6 +13,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | ------ | ------ |
 | `-h` \| `--help`       | Print Options and Arguments.|
 | `--man`              |Print complete man page.|
+|`--complete` | Prints the code to activate tab completion (also used in the internal completion) |
 | `-v` \| `--verbose`    |Log more to the screen|
 | `-D` \| `--DEBUG`      |Log a bit more to the screen|
 | `-d` \| `--dryrun`     |Do not execute, but show all that would have been run|
@@ -217,8 +218,12 @@ Say we want to run, from the suit `JAVATRANSACTIONS` the test `JAVASERVER-SERVIC
  Thus, a `./scripts/test1=` or `./scripts/test1=+` will match any servergroup.
  A `./scripts/test1=+ET`will match `*ET` (all servergroups ending with `ET`)
  A `./scripts/test1=++ET`will match `*-ET` (all servergroups ending with `-ET`)
- 
- 
+
+
+Tip: the newest servergroup file in ./servers/ is aliased to #, so to run a script on all the server in that latest file:
+
+./evidencer os.show.boottime=#
+
 ### Scripts file naming
 For scripts, you can use labels that are unique until the `=` divider. Then you can add a search string that matches potential servergroup files.
 For example:
@@ -544,15 +549,36 @@ function _getopt_complete () {
 }
 complete -F _getopt_complete evidencer
 ```
+
+you can also run the following:
+
+`./evidencer --complete >> ~/.bashrc`
+
+If you do not want to change your .bashrc, then run this to get tab expansion in your current terminal:
+
+`eval $(./evidencer --complete)`
+
 tip: Make sure your ./scripts/ are executable (chmod +x) and have a '=' sign in their name.
 
-Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, add a plus to the end, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab.
+Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, add a plus to the end, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab, and if it's the only suggestion, then that is expanded in one go.
 
 ## Build in Help
 
 You can add help comments in all scripts in ./scripts/, then, when you have a substring of a script, you can use `-h` to show only the help. Use `-hv` for extended help. To acomplish this you need to have lines that start with `#:` and the extended help lines need to start with `#+:`
 To show all help available, use a dot: `./evidencer . -h` 
 (you can switch the order of the parameters)
+
+If you do not want colors, use NOCOLORS, like so:
+
+./evidencer . -hv -r NOCOLORS=2
+
+You can put this variable also in your evidencer.cfg file:
+
+```
+# NOCOLORS=     # default. Display help with colors
+# NOCOLORS=1    # Only headers are bold, the rest is monochromatic
+# NOCOLORS=2    # fully monochromatic, useful for storing in a text file.
+```
 
 ## Focus on one suit
 You can go into a suit, pull evidencer your way by using a symlink, and symlink that suit directory to your home for quick access, like so:
