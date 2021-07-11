@@ -11,6 +11,7 @@ use feature 'say';
 
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
+my @DEFERARR; # Keep the execution order as much as possible
 my %CFGSTOR;
 my %RICH;     # for forcing a new servergroup file
 my %CFG;      # Variable configuration
@@ -85,7 +86,10 @@ our %OPTIONS = (
 	'q|quote'       => \$BASECFG{QUOTE},
 	't|test:s'      => \$BASECFG{TEST},
 	'w|warnings'    => \$BASECFG{WARNINGS},
+	'query=s@'      => \$BASECFG{QUERY},
+	'l|loop=s@'     => \$BASECFG{LOOP},
 );
+
 GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
 
 # Do not override these from configuration file if set from the commandline through params
@@ -95,7 +99,7 @@ pod2usage( -verbose => 1 ) if defined $opt_help && !@ARGV;
 pod2usage( -verbose => 2 ) if defined $opt_man;
 
 # Make sure at least one argument provided
-if ( !$opt_complete && !@ARGV && !$BASECFG{'CREATEDIRS'} ) {
+if ( !$opt_complete && !@ARGV && !$BASECFG{'CREATEDIRS'} && !$BASECFG{'QUERY'} ) {
 	pod2usage( -verbose => 0, -message => "$0: one argument required" );
 }
 
@@ -168,6 +172,19 @@ sub readCFG
 readCFG( $CFGFILE ); # Read toplevel evidencer.cfg only for CFGDIR
 $BASECFG{'CFGDIR'} = $CFG{'CFGDIR'} if $CFG{'CFGDIR'} ne $BASECFG{'CFGDIR'};
 readCFG( $CFGFILE, $SUIT ) if $SUIT;
+
+# Get a single variable defined in the .cfg file, and print it out.
+if(defined $BASECFG{'QUERY'}){
+	say $_.'='.($CFG{$_}?$CFG{$_}:"") for (@{$BASECFG{'QUERY'}});
+	exit;
+}
+
+# Replace =# with the -l loop serverscripts (can be comma separated)
+if(defined $BASECFG{'LOOP'}){
+	my $svrs = join ",", @{$BASECFG{'LOOP'}};
+	grep s/=\K#/$svrs/e,@ARGV;
+}
+
 %_CFG = UnDeepCopy( \%CFG );    # Backup real base configuration so each test can change it
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 
@@ -415,6 +432,7 @@ sub getscripts
 	my @REG_SERVERS;
 	my %SCRIPT_FILES;
 
+	$scripts=~s/,/|/g; # allow for script=file1,file2
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
 	my $scriptsdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
 	my $serversdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
@@ -447,7 +465,6 @@ sub getscripts
 	# support for last modified scripts file. test=#
 	my $last_only = 0;
 	if($reg_servers eq '#'){
-		$reg_servers = '*';
 		$last_only=1;
 	}
 
@@ -463,7 +480,7 @@ sub getscripts
 		if($last_only){
 			push( @REG_SERVERS, map basename($_->[0]),
 			sort { $b->[1] <=> $a->[1] } map [ $_, +(stat $_)[9] ],
-			grep $_ ne '.' && $_ ne '..', glob( $serversdir . '/' . $reg_server ) );
+			grep $_ ne '.' && $_ ne '..', glob( $serversdir . '/' . '*' ) );
 			$scripts = $REG_SERVERS[0] || "";
 		}else{
 			push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
@@ -497,7 +514,6 @@ sub getscripts
 		if ( @REG_SCRIPTS && !$matches && $CFG{'WARNINGS'} );
 	%SCRIPT_FILES;
 }
-
 # Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
 for my $argv (@ARGV) {
 
@@ -669,9 +685,15 @@ for my $argv (@ARGV) {
 			}
 
 			if ( $CFG{'FOLD'} || $CFG{'GROUP'} || $CFG{'BUNDLE'} ) {
+				say "Defering execution("
+				.($CFG{'FOLD'}?'F':'f')
+				.($CFG{'GROUP'}?'G':'g')
+				.($CFG{'BUNDLE'}?'B':'b')
+				."): $CFG{'RUNSCRIPT'} on $CFG{'RUNSERVER'}" if $CFG{'DEBUG'};
 				$DEFER{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }++;
 				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }} = UnDeepCopy(\%CFG) unless $CFG{'GROUP'};
 				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{'_'}} = UnDeepCopy(\%CFG);
+				push @DEFERARR, $CFG{'RUNSCRIPTFQ'}  unless (grep $_ eq $CFG{'RUNSCRIPTFQ'}, @DEFERARR);
 			} else {
 				$CFG{'RUNNAMES'} = $CFG{'RUNNAME'};
 				&executerun();
@@ -706,7 +728,7 @@ if (%DEFER) {
 	}
 	$CFG{'RUNNAMES'} = join '+', grep { s{.*/}{}; s{=.*}{}; } sort keys %DEFER;
 
-	for my $scripts ( sort keys %DEFER ) {
+	for my $scripts ( $CFG{'FOLD'}? sort keys %DEFER : @DEFERARR) {
 		$CFG{'RUNSCRIPTFQ'} = $scripts;
 		for my $servers ( sort keys %{ $DEFER{$scripts} } ) {
 			$CFG{'RUNSERVERFQ'} = $servers;
