@@ -4,8 +4,13 @@ use feature say;
 use Data::Dumper;
 
 my $exe = "./evidencer";
-
 ok( -f $exe , 'Evidencer binary found' );
+
+system '/usr/bin/perl','-w','-c',$exe;
+ok( $? == 0 , 'Perl Compiles the binary' );
+exit if $?;
+
+
 my $TDIR = "./suits/BUILDTEST";
 
 print "d=".(-d $TDIR);
@@ -132,6 +137,42 @@ subtest 'argument1' => sub {
   like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument incredible!, 'argument2a');
 };
 
+@_ = `$exe -s BUILDTEST =# -dv |grep -v '# RUN:'|grep RUN`;
+say @_;
+is($#_,2-1,'hash is latest');
+like($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-ET/, 'TEST1 on ET');
+like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-ET/, 'TEST2 on ET');
+
+@_ = `$exe -s BUILDTEST =# -dv -l VM-PR |grep -v '# RUN:'|grep RUN`;
+say @_;
+is($#_,2-1,'Test --loop 1');
+unlike($_[0], qr/DMZ/, 'TEST1 on PR through --loop 1 - no DMZ match');
+unlike($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-PR/, 'TEST1 on PR through --loop 1');
+like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR through --loop 1');
+
+@_ = `$exe -s BUILDTEST =# -v -l VM-PR |grep -v '# RUN:'|grep RUN`;
+say @_;
+is($#_,2-1,'Test --loop 2');
+unlike($_[0], qr/DMZ/, 'TEST1 on PR through --loop 2 - no DMZ match');
+unlike($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-PR/, 'TEST1 on PR through --loop 2 - no ET match');
+like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR through --loop 2');
+
+subtest 'LOOPs are same as not using loops' => sub {
+  plan tests => 6;
+	my @ONE= `$exe -s BUILDTEST =# -dv -l VM-PR |grep -v '# RUN:'|grep RUN`;
+	my @TWO= `$exe -s BUILDTEST =VM-PR -dv  |grep -v '# RUN:'|grep RUN`;
+	while($a=shift(@ONE)){
+		$b = shift @TWO;
+		is($a,$b,"Loop v/s noloop one element is same");
+	}
+
+	my @ONE= `$exe -s BUILDTEST =# -dv -l VM-PR,VM-ET |grep -v '# RUN:'|grep RUN`;
+	my @TWO= `$exe -s BUILDTEST =VM-PR,VM-ET -dv  |grep -v '# RUN:'|grep RUN`;
+	while($a=shift(@ONE)){
+		$b = shift @TWO;
+		is($a,$b,"Loop v/s noloop two elements is same");
+	}
+};
 
 
 done_testing();

@@ -88,6 +88,7 @@ our %OPTIONS = (
 	'w|warnings'    => \$BASECFG{WARNINGS},
 	'query=s@'      => \$BASECFG{QUERY},
 	'l|loop=s@'     => \$BASECFG{LOOP},
+	'o|on=s@'       => \$BASECFG{ON},
 );
 
 GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
@@ -177,12 +178,6 @@ readCFG( $CFGFILE, $SUIT ) if $SUIT;
 if(defined $BASECFG{'QUERY'}){
 	say $_.'='.($CFG{$_}?$CFG{$_}:"") for (@{$BASECFG{'QUERY'}});
 	exit;
-}
-
-# Replace =# with the -l loop serverscripts (can be comma separated)
-if(defined $BASECFG{'LOOP'}){
-	my $svrs = join ",", @{$BASECFG{'LOOP'}};
-	grep s/=\K#/$svrs/e,@ARGV;
 }
 
 %_CFG = UnDeepCopy( \%CFG );    # Backup real base configuration so each test can change it
@@ -393,6 +388,21 @@ if ( $CFG{'CREATEDIRS'} ) {
 pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITSDIR'}\n" )
   unless -d $CFG{'SUITSDIR'};
 
+if ( defined $BASECFG{'ON'} ) {
+    my $tempserverfile = $CFG{'TMPFILE'}? $CFG{'TMPFILE'} : 'tmp.lst';
+    my $tempserverfilefq = $CFG{'SUITSDIR'} .'/'. $SUIT .'/'. $CFG{'SERVERS'} .'/'. $tempserverfile;
+    say "Saving ON list to $tempserverfilefq" if $CFG{'DEBUG'};
+    open(my $sfh, '>', $tempserverfilefq) or die "FATAL: $tempserverfilefq $!";
+    for my $on (@{$BASECFG{'ON'}}){
+        for my $svr (split /,/, $on){
+            chomp $svr;
+            say $sfh, $svr;
+        }
+    }
+    close $sfh;
+    push @{$BASECFG{'LOOP'}}, $tempserverfile;
+}
+
 runit('RUN_START');
 
 # Split argument string into suit, scripts and hoststr (suit:scripts=+:hoststr)
@@ -432,7 +442,6 @@ sub getscripts
 	my @REG_SERVERS;
 	my %SCRIPT_FILES;
 
-	$scripts=~s/,/|/g; # allow for script=file1,file2
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
 	my $scriptsdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
 	my $serversdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
@@ -466,6 +475,11 @@ sub getscripts
 	my $last_only = 0;
 	if($reg_servers eq '#'){
 		$last_only=1;
+	}else{
+		my @svr_regexp = split(/,/, $reg_servers);
+		$reg_scripts =~s/\*/\\*/g; # Escape asterix for glob to work
+		# allow for script=file1,file2 by translating to: ^script=file1$|^script=file2$
+		$scripts = join '|', glob "{\^}{$reg_scripts}={$reg_servers}{\$}";
 	}
 
 	# Now, for the found scripts, check the servers part and match it against it's $reg_server
@@ -494,7 +508,6 @@ sub getscripts
 			$scriptserver =~ s/=\K.*/$server/;
 			my $scriptsreg = $scripts;
 			globlize($scriptsreg);
-			$scriptsreg .= '$';
 			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
 			my $is_match = $scriptserver =~ /$scriptsreg/;
 			++$matches if $is_match;
@@ -514,6 +527,7 @@ sub getscripts
 		if ( @REG_SCRIPTS && !$matches && $CFG{'WARNINGS'} );
 	%SCRIPT_FILES;
 }
+
 # Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
 for my $argv (@ARGV) {
 
@@ -531,6 +545,12 @@ for my $argv (@ARGV) {
 		push @{$CFG{'REDEFINE'}}, $argv;
 		&redefine();
 		next;
+	}
+
+	# Replace =# with the -l loop serverscripts (can be comma separated)
+	if(defined $BASECFG{'LOOP'}){
+		my $svrs = join ",", @{$BASECFG{'LOOP'}};
+		grep s/=\K#/$svrs/e,$argv;
 	}
 
 	%CFG = UnDeepCopy( \%_CFG ) if $#ARGV;    # only restore if more than one test
@@ -991,8 +1011,10 @@ sub getdir
 sub redefine
 {
 	my $n=-1;
+	#@{ $CFG{'REDEFINE'} } = grep defined, @{ $CFG{'REDEFINE'} }; # remove undef elements
 	for my $redef ( @{ $CFG{'REDEFINE'} } ) {
 		++$n;
+		next unless defined $redef;
 		$redef=~s/^\s+|\s+$//g; # trim
 		next unless $redef;
 		my $_redef = $redef;
@@ -1013,6 +1035,7 @@ sub redefine
 			next;
 		}
 		# now they are in the form: variable=value, split and assign to %CFG
+		$_redef =~ s/^&//; # to allow for argument and parameter aliases to work
 		@_ = split /=/, $_redef, 2;
 		say "# redef=($redef)" if $CFG{'DEBUG'};
 		if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
@@ -1292,6 +1315,8 @@ or each of these and a RUN_ABORT when file IO fails.
  -s | --suit <suit> Only consider this suit for all script-server matches
  -w | --warnings    Enable warnings when your script=server combination does not match anything. 
                     Set WARNINGS=1 in the configuration file to enable it by default
+ -o | --on <host>   Comma separated list of hosts (will create a serverfile for you) for =#
+ -l | --loop <$>    Loop on comma separated list of serverfiles for =#
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
