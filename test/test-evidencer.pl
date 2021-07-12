@@ -174,6 +174,21 @@ subtest 'LOOPs are same as not using loops' => sub {
 	}
 };
 
+subtest 'Test accuracy of new regexp' => sub {
+  plan tests => 8;
+	@_ = `$exe -s BUILDTEST 'TEST[12]=+PR' -v |grep -v '# RUN:'|grep RUN`;
+	say @_;
+	is($#_,2-1,'two lines for output accuracy');
+	like($_[0], qr/BUILDTEST:TEST1=\+\+PR on VM-PR/, 'TEST1 accuracy test with new rexexp PR');
+	like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 accuracy test with new rexexp PR');
+	@_ = `$exe -s BUILDTEST 'TEST[12]=+PR,+ET' -v |grep -v '# RUN:'|grep RUN`;
+	say @_;
+	is($#_,4-1,'four lines for output accuracy');
+	like($_[1], qr/BUILDTEST:TEST1=\+\+PR on VM-PR/, 'TEST1 accuracy test with new rexexp PR - multiple');
+	like($_[3], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 accuracy test with new rexexp PR - multiple');
+	like($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-ET/, 'TEST1 accuracy test with new rexexp ET - multiple');
+	like($_[2], qr/BUILDTEST:TEST2=\+\+ET on VM-ET/, 'TEST2 accuracy test with new rexexp ET - multiple');
+};
 
 done_testing();
 

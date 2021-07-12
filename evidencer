@@ -476,8 +476,7 @@ sub getscripts
 	if($reg_servers eq '#'){
 		$last_only=1;
 	}else{
-		my @svr_regexp = split(/,/, $reg_servers);
-		$reg_scripts =~s/\*/\\*/g; # Escape asterix for glob to work
+		$reg_scripts =~s/([*\[\]])/\\$1/g; # Escape asterix for glob to work
 		# allow for script=file1,file2 by translating to: ^script=file1$|^script=file2$
 		$scripts = join '|', glob "{\^}{$reg_scripts}={$reg_servers}{\$}";
 	}
