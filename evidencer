@@ -289,6 +289,13 @@ if ($opt_complete)
 		exit 0;
 	}
 
+	# Process ALIAS that start with /
+	if ( $_ARGV[-1] =~ m/^\// && $m >0) {
+		$search = $_ARGV[-1];
+		say join " ", grep { /^$search/ }  (sort keys %{$CFG{'ALIAS'}});
+		exit 0;
+	}
+
 	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
 
 	my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } getdir(${SUITDIR}.$CFG{'SERVERS'});
@@ -317,7 +324,7 @@ if ($opt_complete)
 			$search eq '='
 			? $_ARGV[ $ENV{'COMP_CWORD'} ] . '=+'
 			: $_ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=' . $search;
-		@candidates = ( $search . '*' );
+		@candidates = ( $search );
 	}
 
 	if ( $#candidates == 0 && $candidates[0] !~ /=/ ) {
@@ -343,7 +350,6 @@ if ($opt_complete)
 					$a =~ s/.*:// unless $k =~ /:/;
 					++$K{$a};
 					my $c = "$a=$b";
-					$c =~ s/^$k// if $k =~ /\-$/;
 					$c =~ s/.*=//
 					  if ( $realsearch !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] eq '=' )
 					  || $realsearch eq '=';
@@ -478,7 +484,11 @@ sub getscripts
 	}else{
 		$reg_scripts =~s/([*\[\]])/\\$1/g; # Escape asterix for glob to work
 		# allow for script=file1,file2 by translating to: ^script=file1$|^script=file2$
-		$scripts = join '|', glob "{\^}{$reg_scripts}={$reg_servers}{\$}";
+		if($opt_complete){
+			$scripts = join '|', glob "{\^}{$reg_scripts}={$reg_servers}";
+		}else{
+			$scripts = join '|', glob "{\^}{$reg_scripts}={$reg_servers}{\$}";
+		}
 	}
 
 	# Now, for the found scripts, check the servers part and match it against it's $reg_server
@@ -1316,6 +1326,7 @@ or each of these and a RUN_ABORT when file IO fails.
                     Set WARNINGS=1 in the configuration file to enable it by default
  -o | --on <host>   Comma separated list of hosts (will create a serverfile for you) for =#
  -l | --loop <$>    Loop on comma separated list of serverfiles for =#
+ --query <var>      Prints the value of a variable defined in your evidencer.cfg and exits
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
