@@ -185,6 +185,7 @@ cat << EOF
 Run: ./evidencer  and press tab a lot to select your script
 Also run: ./evidencer spoon+   and press tab to show a list of scripts that contain 'spoon'
 Tab expansion also works to select a suit after typing -s
+Note that tab expansion is still buggy when adding aliases and other parameters it can not match.
 
 EOF
 
@@ -195,5 +196,9 @@ instead of . you can use a substring of a script, and it will display that scrip
 
 Using -h without any parameters gives you help about evidencer itself.
 Using --man without any parameters gives you a pseudo man page.
+
+If your terminal does not support ANSI color codes, then use -r NOCOLORS=2 to print out the help:
+./evidencer . -hvr NOCOLORS=2
+
 
 EOF
