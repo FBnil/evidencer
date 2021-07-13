@@ -970,6 +970,7 @@ sub updateTime
 	$v->{"MONTH"} = ++$T[4] < 10 ? '0' . $T[4] : $T[4];    # 01=jan ... 12=dec
 	$v->{"YEAR"} = $T[5] + 1900;                           # 4 digits year
 	$v->{"DS"}   = $T[8];                                  # daylightsaving
+	$v->{"WN"}   = int($T[7] / 7) + 1;                     # Week number
 
 	$v->{"TOTALTIME"} = time - $^T;                        # total seconds running
 }
