@@ -42,7 +42,7 @@ my %BASECFG  = (
 	'C:Z' => "\033[7;1m", # INVERT
 	'C:A' => "\033[0;90m", # GRAY
 	'C:O' => "\033[38;5;208m", # ORANGE (might not be available on all terminals)
-	NOCOLORS => 0, # set to 1 in the evidencer.cfg file to disable colored help
+	NOCOLORS => 0, # set to 2 in the evidencer.cfg file to totally disable colored help
 );
 
 my $SUIT = $ENV{'SUIT'} || "";
@@ -176,7 +176,17 @@ readCFG( $CFGFILE, $SUIT ) if $SUIT;
 
 # Get a single variable defined in the .cfg file, and print it out.
 if(defined $BASECFG{'QUERY'}){
-	say $_.'='.($CFG{$_}?$CFG{$_}:"") for (@{$BASECFG{'QUERY'}});
+	my @want;
+	$_=~/,/? push(@want, split(/\s*,\s*/, $_)):push(@want,$_)  for @{$BASECFG{'QUERY'}};
+	my %found;
+	for my $w (@want){
+		if($w=~s{^/(.*)/$}{$1}){
+			map { ++$found{$_} if /$w/ } (keys %CFG);
+		}else{
+			++$found{$w} if defined $CFG{$w};
+		}
+	}
+	say $_.'='.($CFG{$_}? $CFG{$_}:"") for sort keys %found; # bug: /\033/\\033/g
 	exit;
 }
 
@@ -402,7 +412,7 @@ if ( defined $BASECFG{'ON'} ) {
     for my $on (@{$BASECFG{'ON'}}){
         for my $svr (split /,/, $on){
             chomp $svr;
-            say $sfh, $svr;
+            say $sfh $svr;
         }
     }
     close $sfh;
