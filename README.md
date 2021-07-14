@@ -1,5 +1,7 @@
 # evidencer
-![Evidencer logo](images/text5051.png)
+
+<div align="right"><img align="right" src="images/text5051.png" /><sub><sup>Grudge-2-BRK Font courtesy of Brian Kent</sup></sub></div>
+
 Say you have script files in one directory, and lists of files with servernames in the other, and you want to combine those to run certain scripts on certain servergroups. By cleverly naming the scripts and the servergroup files, you restrict what can run where. Add a few filters to select which scripts, and on which servers you want to run these scripts and you get evidencer.
 Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/rundeer)/[ssh-batch](https://github.com/hans-vervaart/ssh-batch) or similar to produce output (results) you can store on the machine you are running from. Store the output with timedate stamps, and the results become historical "evidence".
 
@@ -34,6 +36,9 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-t` \| `--test` `<arg>` | Final test against a RUN (either before or after RUN_PRE) to validate the combination|
 | `-s` \| `--suit` `<suit>` |search for scripts only from this suit. You can also use the environment variable SUIT|
 | `-w` \| `--warnings` |Enable warnings when your script=server combination does not match anything. Set WARNINGS=1 in the configuration file to enable it by default|
+| `-o` \| `--on` `<host>` |Comma separated list of hosts (will create a serverfile for you) for `=#` |
+| `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#`|
+| `--query` `<var>`  |Prints the value of a variable defined in your evidencer.cfg and exits|
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
@@ -43,7 +48,7 @@ options can be anywhere in the commandline (but not after the `--` parameter). O
 - `./scripts/` Define a list of scripts, by function, to be run on those servers
 - `./results/` Just an empty directory to store results in (from an external program)
 - `./suits/`   Once you are done building your scripts, move them into a suit, still available, but tucked away
-- `./temp/`    Directory used when you use `@hostnames_regexp`
+- `./temp/`    Directory used when you use `@hostnames_regexp` (and temporal files need to be created to filter and merge)
 
 Tip: to create the top-level directories (except ./temp/ which you might want to redefine in a configuration first) use the following command:
 `./evidencer -s .. -C`
@@ -295,13 +300,13 @@ All variables that have to do with running found combinations of servers and scr
 |RUNSERVERFQ|Fully Qualified name for the servers file, basically: `%{RUNSERVERSDIR}`/`%{RUNSERVER}`|
 |RUNNAME|The name of the scripts file being processed %{RUNSCRIPT}, but stripped of the `=` and everything to the right|
 |RUNNAMES|If you `--bundle` or `--fold` you might want to use the `+` concated scripts names, instead of `RUNNAME` which will contain only the last one|
-|TEST|Argument string given with --test on the commandline (available as `%{TEST}`). It can be used in your `RUN_PRE_TEST` or `RUN_TEST` (and `RUN_POST_TEST`), which only activate when --test is used|
-|RUN_PRE_TEST|Execute this string in the shell to test the validity of the script+server combination. As with all *_TEST, Exit nonzero to skip execution of `RUN_PRE` and all after |
+|TEST|Argument string given with --test on the commandline (available as `%{TEST}`). It can be used in your `RUN_PRE_TEST` or `RUN_TEST` (and `RUN_POST_TEST`), which only activate when `--test` is used. If tests fail by returning a non-zero exitcode, everything halts|
+|RUN_PRE_TEST|Execute this string in the shell to test the validity of the script+server combination. As with all `*_TEST`, Exit nonzero to skip execution of `RUN_PRE` and all after |
 |RUN_PRE|Execute this string in the shell. Runs before `RUN`. Time date strings are set before `RUN_PRE` and are the same for `RUN` and `RUN_POST` even if they take time to execute. Exit nonzero to skip.|
 |RUN_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip `RUN` (but `RUN_PRE` already ran if it was defined)|
 |RUN|Execute this string in the shell|
 |RUN_POST|Execute this string in the shell. Runs after `RUN`|
-|KEEP|Set to true(1) to keep temporal files created when @hostnames is used|
+|KEEP|Set to true(1) to keep temporal files created when `@hostnames` is used|
 |RUN_START|Run just before the first `RUN_PRE` is ran. If no scripts+servers is matched, then this does not trigger either|
 |RUN_FINISH|Runs at the very end of the evidencer script, only if `RUN_START` ran|
 |RUN_BEGIN|This always runs at the beginning|
@@ -328,7 +333,7 @@ RUN_FAIL=echo "B0RKEN %{RUNNAME} %{ERRORCODE}" >> %{RUNRESULTSDIR}/%{RUNNAME}.er
 RUN_POST=ls /tmp/pqowieur | tee -a /tmp/log.log ; . ./bin/ec.1
 RUN_POST_FAIL=echo "I will run if the file /tmp/pqowieur does not exist"
 ```
-Interesting case is the one presented with `RUN_POST`. The tee is handy, because you get output while it runs, however, it always returns true if itself is able to store/append to the logfile. It does not propagate the error from the previous command. To do this, we use `test ${PIPESTATUS[0]} -eq 0`, however, Perl interpolates `$` as a variable, so you need to wrap it in a script, and then source it.
+Interesting case is the one presented with `RUN_POST`. The tee is handy, because you get output while it runs, however, it always returns true if itself is able to store/append to the logfile. It does not propagate the error from the previous command. To do this, we use `test ${PIPESTATUS[0]} -eq 0`, however, evidencer interpolates `${}` as a variable, so you need to wrap it in a script, and then source it.
 
 The content of `./bin/ec.1` is:
 ```
@@ -356,7 +361,8 @@ RUN=%{BASEDIR}/bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTSDIR}/HEADER.sh %{RUNS
 |SS|Time seconds (00..23)|
 |WD|Weekday 1=Monday ... 6=Saturday, 7=Sunday|
 |YD|Yearday. Day of the year, in the range 001..365 (or 001..366 if leap year)|
-|DAY|day of the month (01..)|
+|WN|WeekNumber. Week of the year, in the range 01..52 (or 01..53 on some years)|
+|DAY|day of the month (01..31)|
 |MONTH|01=jan ... 12=dec|
 |YEAR|4 digits year|
 |DS|daylightsaving|
@@ -475,28 +481,12 @@ Keep it mind to not clash with substrings with boundaries in your script names. 
 
 For anything more complex, consider using a separate configuration file and calling it with `--config` (or the shorter `-c`)
 
-### REDEFINE
-
-If you have an evidencer.cfg that looks like this:
-```sh
-ALIAS PARALLEL=RUN=%{PARALLEL_RUN}
-PARALLEL_RUN=%{BASEDIR}/bin/ssh-batch --bg-log-dir %{RUNRESULTSDIR} %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}-parallel.log
-RUN=%{BASEDIR}/bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > %{RUNRESULTSDIR}/%{RUNNAME}.log
-```
-
-We can replace the `RUN` variable with another value:
-```./evidencer test1 -r 'RUN=%{PARALLEL_RUN}'```
-or we can make use of an ALIAS to do the same:
-```./evidencer test1 -r PARALLEL```
-
-and the normal RUN parameter will be replaced by the parallel form of `ssh-batch`.
-
-Keep it mind to not clash with substrings with boundaries in your script names. So do not create a script called `PARALLEL=+`, nor `PARALLEL-CHECK=+`, but `parallel=+` and `PARALLELS=+` are ok.
-
 You can also disable/enable settings, for example if folding is enabled in the CFG `FOLD=1`, then you can disabled it from the commandline:
 ```
 ./evidencer -r FOLD=0 ...
 ```
+
+
 
 ### QUOTE
 If you have a path with spaces, it is useful to quote them before using them, to do this, use `--quote` The default is a single quote. You can override this by setting `QUOTESTR`. Note that setting the `QUOTESTR` by itself will not automatically enabled quoting. 
@@ -570,20 +560,61 @@ Tab-completion starts from the beginning of each ./scripts/ file, if you know wh
 ## Build in Help
 
 You can add help comments in all scripts in ./scripts/, then, when you have a substring of a script, you can use `-h` to show only the help. Use `-hv` for extended help. To acomplish this you need to have lines that start with `#:` and the extended help lines need to start with `#+:`
-To show all help available, use a dot: `./evidencer . -h` 
+To show all help available, use a dot: `./evidencer . -hv` 
 (you can switch the order of the parameters)
 
 If you do not want colors, use NOCOLORS, like so:
 
-./evidencer . -hv -r NOCOLORS=2
+`./evidencer . -hv -r NOCOLORS=2`
 
 You can put this variable also in your evidencer.cfg file:
 
-```
-# NOCOLORS=     # default. Display help with colors
-# NOCOLORS=1    # Only headers are bold, the rest is monochromatic
-# NOCOLORS=2    # fully monochromatic, useful for storing in a text file.
-```
+`# NOCOLORS=`     # default. Display help with colors
+
+`NOCOLORS=1`    # Only headers are bold, the rest is monochromatic
+
+`NOCOLORS=2`    # fully monochromatic, useful for storing in a text file.
+
+### SCRIPTS HELP
+
+You can look up also only one script's help, for example, if we have `get.a.spoon=+`, we can get it's help using a substring that matches its name, for example:
+`./evidencer spoon -hv`
+
+If you are making your own help text inside scripts, then you can add colors with `<C>`, 
+where C is a character, or a number. The available characters are viewable with:
+`grep C: evidencer |grep 033 |grep =`
+
+#### You can use the following text accents
+|code|color/effect|
+|---|---|
+| `<B>` | BOLD |
+| `<I>` | ITALIC |
+| `<N>` | Normal |
+| `<U>` | UNDERLINE |
+| `<R>` | RED |
+| `<G>` | GREEN |
+| `<Y>` | YELLOW |
+| `<L>` | BLUE |
+| `<P>` | PURPLE |
+| `<C>` | CYAN |
+| `<Z>` | INVERT |
+| `<A>` | GRAY |
+| `<O>` | ORANGE|
+| `<165>` | Magenta2 |
+| `<140>` | MediumPurple2 |
+| `<99>`  | SlateBlue1 |
+| `<236>` | Grey19 |
+| `<070>` | Chartreuse3 |
+
+Look up colorscodes by name on the web: https://jonasjacek.github.io/colors/
+
+Look up colorcodes on the terminal https://www.perturb.org/code/term-colors.pl
+
+To mark multiple words in a span, use a colon, like so: `<B:>`with the end tag `<:>`
+
+
+Note: `ssh-batch` skips all comments, so you are not increasing IO by adding good documentation.
+
 
 ## Focus on one suit
 You can go into a suit, pull evidencer your way by using a symlink, and symlink that suit directory to your home for quick access, like so:
@@ -595,3 +626,29 @@ cd ~/quick
 ./evidencer
 ```
 Tip: When working from within a suit, you do not need to add the "-s suit" or mention the "suit:", it is implied.
+
+Tip: the newest file in `./servers/` is aliased to `#`, so to run a script on all the server in that latest file:
+
+`./evidencer os.show.boottime=#`
+
+## TAB EXPANSION
+
+Evidencer features tab expansion for aliases that start with `/`, for suits if you start with `-s` and for scripts. There are stops at each `.`, so if you have scripts that start with `get.*` and `set.*`, you would see `get.` and `set.` as suggestions.
+
+You can activate tab expansion for evidencer by putting the following in your `~/.bashrc` file:
+
+`./evidencer --complete >> ~/.bashrc`
+
+(and when you do that for the first time, source your bashrc first, or open a new terminal)
+
+If you do not want to change your `.bashrc`, then run this to get tab expansion in your current terminal:
+
+`eval $(./evidencer --complete)`
+
+Sometimes expansion does not work, check that there is no other expansion for the binary defined:
+
+`complete |grep evidencer` and delete it with `complete -r evidencer` then try again.
+
+Tip: For expansion to work, you need to type the beginning of words, if you have a substring, append a `+` then press tab to expand using substring searching.
+
+Note: Tab Expansion is still a bit wonky here and there. (for example, if you go back to left with the cursor, or if you used parameters)
