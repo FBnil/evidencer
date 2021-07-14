@@ -964,13 +964,13 @@ sub updateTime
 	$v->{"MM"} = $T[1] < 10 ? '0' . $T[1] : $T[1];     # minute (00..59)
 	$v->{"SS"} = $T[0] < 10 ? '0' . $T[0] : $T[0];     # seconds (00..23)
 	$v->{"WD"} = $T[6] || 7;                           # 1=Monday ... 6=Saturday, 7=Sunday
+	$v->{"WN"} = sprintf("%02d", int($T[7]/7)+1);      # Week number 01..52/53
 	$v->{"YD"} = sprintf( "%03d", $T[7] + 1 )
 	  ;    # day of the year, in the range 001..365 (or 001..366 if leap year)
 	$v->{"DAY"}   = $T[3] < 10   ? '0' . $T[3] : $T[3];    # day of the month
 	$v->{"MONTH"} = ++$T[4] < 10 ? '0' . $T[4] : $T[4];    # 01=jan ... 12=dec
 	$v->{"YEAR"} = $T[5] + 1900;                           # 4 digits year
 	$v->{"DS"}   = $T[8];                                  # daylightsaving
-	$v->{"WN"}   = int($T[7] / 7) + 1;                     # Week number
 
 	$v->{"TOTALTIME"} = time - $^T;                        # total seconds running
 }
@@ -1352,7 +1352,7 @@ Options can be anywhere in the commandline (but not after the `--` parameter). O
 
 =head1 SCRIPTS HELP
 
-The scripts can have lines that start with #: (vieable with -h) or #+: (vieable with -hv)
+The scripts can have lines that start with #: (viewable with -h) or #+: (viewable with -hv)
 For example:
 ./evidencer spoon -hv
 
