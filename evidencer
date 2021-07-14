@@ -1072,7 +1072,7 @@ __END__
 
 =head1 NAME
 
-evidencer.pl - A program to run scripts on servers
+evidencer.pl - A program to combine scripts and servers to run scripts on servers.
 
 For the full help, see README.md or directly on L<github|https://github.com/FBnil/evidencer>
 
@@ -1139,6 +1139,9 @@ Note: You can edit evidencer.cfg beforehand to redefine these directory names. S
 There are 3 level of configuration files: the toplevel, evidencer.cfg, then inside a suit, also
 named evidencer.cfg, and then per script, the name of the script up to the = and then .cfg
 
+Note: If you rename evidencer to something more to your liking, you need to rename the cfg too.
+
+The variables that can be used are:
 
 =over 10
 
@@ -1177,7 +1180,13 @@ Just a directory where the results are to be kept. The default is RESULTS=result
 
 =item B<ALIAS>
 
-You can define multiple aliases. The suit and the script in the commandline parameters are un-aliased. The hostnames_regexp is not. Example: ALIAS ES=ELASTICSEARCH
+You can define multiple aliases. The suit and the script in the commandline parameters are un-aliased, the hostnames_regexp is not. Example: ALIAS ES=ELASTICSEARCH
+
+Alias can also be used as a parameter, but only from the point you define them in the commandline, unless you use -r, in that case it is processed before anything else.
+
+=item B<TMPFILE>
+
+If you use --on to loop over machinenames, a file, ./servers/tmp.lst will be created for you, with the content of the hostnames in the commandlines. You can change 'tmp.lst' my defining TMPFILE
 
 
 =back
