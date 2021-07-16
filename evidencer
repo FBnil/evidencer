@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r119';
+my $VERSION = '0.9r120';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -26,7 +26,7 @@ my %BASECFG  = (
 	SEPARATOR => "  ",
 	ARG       => undef,
 	QUOTESTR  => "'",
-	CFGDIR    => "cfg",
+	CFGDIR    => "",
 	TOTALERRORS => 0,
 	# COLORS
 	'C:'  => "\033[0m", # Normal
@@ -69,11 +69,11 @@ our %OPTIONS = (
 	'g|group'       => \$BASECFG{GROUP},
 	'b|bundle'      => \$BASECFG{BUNDLE},
 	'r|redefine=s@' => \$BASECFG{REDEFINE},
-	's|suit:s'      => \$SUIT,
-	'S|SEPARATOR:s' => \$BASECFG{SEPARATOR},
-	'a|argument:s'  => \$BASECFG{ARG},
+	's|suit=s'      => \$SUIT,
+	'S|SEPARATOR=s' => \$BASECFG{SEPARATOR},
+	'a|argument=s'  => \$BASECFG{ARG},
 	'q|quote'       => \$BASECFG{QUOTE},
-	't|test:s'      => \$BASECFG{TEST},
+	't|test=s'      => \$BASECFG{TEST},
 	'w|warnings'    => \$BASECFG{WARNINGS},
 	'query=s@'      => \$BASECFG{QUERY},
 	'l|loop=s@'     => \$BASECFG{LOOP},
@@ -81,10 +81,10 @@ our %OPTIONS = (
 	'version'       => \$opt_version,
 );
 
-# Store original ARGV, we use it with Completions, where the COMP_CWORD shift when using modifier arguments
-my @_ARGV = @ARGV;
 
-if(! defined $ENV{'COMP_CWORD'} ){
+if(defined $ENV{'COMP_CWORD'} ){
+	++$opt_complete if grep /^--complete$/, @ARGV;
+}else{
 	# Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
 	if ( grep /^(?:\-\-|—)$/, @ARGV ) {
 		@_ = ();
@@ -93,7 +93,6 @@ if(! defined $ENV{'COMP_CWORD'} ){
 		}
 		$BASECFG{ARG} = join " ", @_;
 	}
-
 	GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
 }
 
@@ -185,14 +184,18 @@ if(defined $BASECFG{'QUERY'}){
 	my @want;
 	$_=~/,/? push(@want, split(/\s*,\s*/, $_)):push(@want,$_)  for @{$BASECFG{'QUERY'}};
 	my %found;
+	my %found_alias;
 	for my $w (@want){
 		if($w=~s{^/(.*)/$}{$1}){
 			map { ++$found{$_} if /$w/ } (keys %CFG);
+			map { ++$found_alias{$_} if /$w/ } (keys %{$CFG{'ALIAS'}});
 		}else{
 			++$found{$w} if defined $CFG{$w};
+			++$found_alias{$w} if defined $CFG{'ALIAS'}{$w};
 		}
 	}
 	say $_.'='.($CFG{$_}? $CFG{$_}:"") for sort keys %found; # bug: /\033/\\033/g
+	say $_.'='.($CFG{'ALIAS'}{$_}? $CFG{'ALIAS'}{$_}:"") for sort keys %found_alias; 
 	exit;
 }
 
@@ -263,39 +266,70 @@ if ($opt_complete)
 	my $search = "";
 	my @candidates;
 	my %K;
-	my $m = $#_ARGV - $ENV{'COMP_CWORD'};
+	my $m = $#ARGV - $ENV{'COMP_CWORD'};
 
-	$search = $_ARGV[ $ENV{'COMP_CWORD'} +1 ] || "";
+	$search = $ARGV[ $ENV{'COMP_CWORD'} +1 ] || "";
 
-	# special case: SUIT
-	if($_ARGV[-1] eq '-s' && ($m>0)){
-		say "-s"; exit;
+	# special case: complete single letter
+	if( ($ARGV[-1] =~ /^-\w/) && ($m>0)){
+		say $ARGV[-1]; exit;
 	}
-	if(($_ARGV[-1] eq '-s')||($_ARGV[-2] eq '-s' && (! -d $CFG{'SUITSDIR'}.'/'.$_ARGV[-1] || ($m>0)))){
-		my @suits = grep { -d "$CFG{'SUITSDIR'}/$_" } getdir($CFG{'SUITSDIR'} );
-		$search=$_ARGV[-1] eq '-s' ? '.' : $_ARGV[-1];
-		@candidates = grep {/^$search/} @suits;
-		say join " ", @candidates;
-		exit;
+
+	# If options have an argument, suggest it.
+	my %PX=(
+		'-c' => {'--config' => sub{
+			my $cdir = $CFG{'CFGDIR'} ? $CFG{'CFGDIR'} : '.';
+			my @cfgs = grep { /\.cfg$/ && -f "$cdir/$_" } getdir($cdir);
+			$search=$ARGV[-1] =~/^-/ ? '.' : $ARGV[-1];
+			@candidates = grep { $_=$cdir.'/'.$_; /^$search/} @cfgs;
+			say join " ", @candidates;
+		}},
+		'-s' => {'--suit' => sub{
+			my @suits = grep { -d "$CFG{'SUITSDIR'}/$_" } getdir($CFG{'SUITSDIR'} );
+			$search=$ARGV[-1] eq '-s' ? '.' : $ARGV[-1];
+			@candidates = grep {/^$search/} @suits;
+			say join " ", @candidates;
+		}},
+	);
+
+	for my $short_opt (keys %PX){
+		for my $long_opt (keys %{$PX{$short_opt}}){
+			if(($ARGV[-1] eq $short_opt || $ARGV[-1] eq $long_opt)
+			|| ($ARGV[-2] eq $short_opt || $ARGV[-2] eq $long_opt) && $m>0){
+				&{$PX{$short_opt}{$long_opt}};
+				exit;
+			}
+		}
 	}
 
 	# $search =~s/\\=/=/; # remove backquote before equals, set by Completions
 	my $realsearch = $search;
 
 	# Process parameters that start with -
-	if ( $_ARGV[-1] =~ m/^\-/ && $m >0) {
-		$search = $_ARGV[-1];
+	if ( $ARGV[-1] =~ m/^\-/ && $m == 0) {
+		$search = $ARGV[-1];
+		my %P = map {@_=split(/\W+/); $_[0]=>1,$_[1]=>1} grep{/=/} keys %OPTIONS;
+		$search=~s/^-//g;
+		say "?" if ($P{$search}); # If needs argument, suggest a ?
+		exit;
+	}
+
+	if ( $ARGV[-1] =~ m/^\-/ && $m >0) {
+		$search = $ARGV[-1];
 		my $dashes = 0;
 		@candidates = keys %OPTIONS;
 		if ( $search =~ s/^\-\-// ) {
-			s/^.\||[:=].*$// for @candidates;
+			s/^.\|// for @candidates;
+			s/[\:\=\|!].*$// for @candidates;
 			$dashes = 2;
 		} elsif ( $search =~ s/^\-// ) {
-			s/\|.*// for @candidates;
+			@_ = ();
+			s/\|.*//g?push @_,$_:0 for @candidates;
+			@candidates=@_;
 			$dashes = 1;
 			push @candidates, '-';
 		}
-		s/:.*// for @candidates;
+
 		if($search){
 			@candidates = map { $_ = '-' x $dashes . $_ } grep {/^$search/} @candidates;
 		}else{
@@ -306,8 +340,8 @@ if ($opt_complete)
 	}
 
 	# Process ALIAS that start with /
-	if ( $_ARGV[-1] =~ m/^\// && $m >0) {
-		$search = $_ARGV[-1];
+	if ( $ARGV[-1] =~ m/^\// && $m >0) {
+		$search = $ARGV[-1];
 		say join " ", grep { /^$search/ }  (sort keys %{$CFG{'ALIAS'}});
 		exit 0;
 	}
@@ -326,7 +360,7 @@ if ($opt_complete)
 			say join " ", @candidates;
 			exit ;
 		}
-	} elsif ( $search !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] ne '=' ) {
+	} elsif ( $search !~ /=/ && $ARGV[ $ENV{'COMP_CWORD'} ] ne '=' ) {
 		my @M = @methods;
 		if($search=~s/\+/.*/g){
 			++$K{$_} for grep { /$search/ } @M;
@@ -335,11 +369,11 @@ if ($opt_complete)
 		}
 		@candidates = keys %K;
 	}
-	if ((@ARGV && $_ARGV[ $ENV{'COMP_CWORD'} ] eq '=') || $search eq '=' ) {
+	if ((@ARGV && $ARGV[ $ENV{'COMP_CWORD'} ] eq '=') || $search eq '=' ) {
 		$search =
 			$search eq '='
-			? $_ARGV[ $ENV{'COMP_CWORD'} ] . '=+'
-			: $_ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=' . $search;
+			? $ARGV[ $ENV{'COMP_CWORD'} ] . '=+'
+			: $ARGV[ $ENV{'COMP_CWORD'} - 1 ] . '=' . $search;
 		@candidates = ( $search );
 	}
 
@@ -367,7 +401,7 @@ if ($opt_complete)
 					++$K{$a};
 					my $c = "$a=$b";
 					$c =~ s/.*=//
-					  if ( $realsearch !~ /=/ && $_ARGV[ $ENV{'COMP_CWORD'} ] eq '=' )
+					  if ( $realsearch !~ /=/ && $ARGV[ $ENV{'COMP_CWORD'} ] eq '=' )
 					  || $realsearch eq '=';
 					++$T{$c};
 				}
@@ -491,8 +525,10 @@ sub getscripts
 
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
-	warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n"
-		unless @REG_SCRIPTS || !$CFG{'WARNINGS'};
+	if(! defined $ENV{'COMP_CWORD'} ){
+		warn "Nothing found for SCRIPTS $scriptsdir/$scripts\n"
+			unless @REG_SCRIPTS || !$CFG{'WARNINGS'};
+	}
 
 	# support for last modified scripts file. test=#
 	my $last_only = 0;
