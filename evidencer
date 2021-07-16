@@ -9,6 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
+my $VERSION = '0.9r0';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -49,19 +50,7 @@ my $SUIT = $ENV{'SUIT'} || "";
 $SUIT = $1 if ( !$SUIT && getcwd() =~ m{/suits/(\w+)} );
 
 my %opt;
-my ( $opt_help, $opt_man, $opt_complete );
-
-# Store original ARGV, we use it with Completions, where the COMP_CWORD shift when using modifier arguments
-my @_ARGV = @ARGV;
-
-# Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
-if ( grep /^\-\-$/, @ARGV ) {
-	@_ = ();
-	while ( ( $_ = pop @ARGV ) ne '--' ) {
-		unshift @_, $_;
-	}
-	$BASECFG{ARG} = join " ", @_;
-}
+my ( $opt_help, $opt_man, $opt_complete, $opt_version );
 
 our %OPTIONS = (
 	'h|help|?!'     => \$opt_help,
@@ -89,9 +78,26 @@ our %OPTIONS = (
 	'query=s@'      => \$BASECFG{QUERY},
 	'l|loop=s@'     => \$BASECFG{LOOP},
 	'o|on=s@'       => \$BASECFG{ON},
+	'version'       => \$opt_version,
 );
 
-GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
+# Store original ARGV, we use it with Completions, where the COMP_CWORD shift when using modifier arguments
+my @_ARGV = @ARGV;
+
+if(! defined $ENV{'COMP_CWORD'} ){
+	# Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
+	if ( grep /^(?:\-\-|—)$/, @ARGV ) {
+		@_ = ();
+		while ( ( $_ = pop @ARGV ) !~ /^(?:\-\-|—)$/ ) {
+			unshift @_, $_;
+		}
+		$BASECFG{ARG} = join " ", @_;
+	}
+
+	GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
+}
+
+die "$0 Version $VERSION\n" if $opt_version;
 
 # Do not override these from configuration file if set from the commandline through params
 my %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
@@ -480,7 +486,8 @@ sub getscripts
 	$CFG{'RUNSCRIPT'} = $reg_scripts; # make it available
 
 	# If we are using +, transform it to something glob can use to find servers
-	#globlize($reg_servers);
+	globlize($reg_scripts);
+	globlize($reg_servers);
 
 	# Give me all scripts that match the scripts name, independant of servers
 	@REG_SCRIPTS = map { basename($_) } glob( $scriptsdir . '/' . "$reg_scripts=*" );
@@ -493,6 +500,7 @@ sub getscripts
 		$last_only=1;
 	}else{
 		$reg_scripts =~s/([*\[\]])/\\$1/g; # Escape asterix for glob to work
+		$reg_servers =~s/([*\[\]])/\\$1/g;
 		# allow for script=file1,file2 by translating to: ^script=file1$|^script=file2$
 		if($opt_complete){
 			$scripts = join '|', glob "{\^}{$reg_scripts}={$reg_servers}";
@@ -526,6 +534,7 @@ sub getscripts
 			my $scriptserver = $script;
 			$scriptserver =~ s/=\K.*/$server/;
 			my $scriptsreg = $scripts;
+			$scriptsreg =~ s/\./\\./g;
 			globlize($scriptsreg);
 			$scriptsreg =~ s/([\*\?])/.$1/g;    # glob-regexp to perl-regexp
 			my $is_match = $scriptserver =~ /$scriptsreg/;
@@ -936,11 +945,11 @@ sub runit
 # transform lazy search into a glob-able pattern
 sub globlize
 {
-	$_[0] =~ s/^(\+\+)|(=\K\+\+)|(\+\+)$/$1||$2?"*-":"-*"/ge;    # ++ to *
-	while ( $_[0] =~ s/\+\+|\-\-/-*-/g ) { }                     # ++ to -*-
-	$_[0] =~ s/\+/\*/g;                                          # all other + to *
-	$_[0] =~ s/^\-/\*-/g;                                        # if starts with -, then *-
-	$_[0] =~ s/\-$/-\*/g;                                        # if ends with -, then  -*
+	$_[0] =~ s/^(\+\+)|(=\K\+\+)|(\+\+)$/$1||$2?"*-":"-*"/ge; # border ++ to *
+	$_[0] =~ s/\+\+|\-\-/-*-/g;                               # middel ++ to -*-
+	$_[0] =~ s/\+/\*/g;                                       # all other + to *
+	$_[0] =~ s/^\-/\*-/g;                                     # if starts with -, then *-
+	$_[0] =~ s/\-$/-\*/g;                                     # if ends with -, then  -*
 }
 
 # xexpands %{} or ${} variables
