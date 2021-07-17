@@ -32,13 +32,14 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-r` \| `--redefine` `<var=val>`|Override a variable from evidencer.cfg (can be used multiple times)|
 | `-a` \| `--argument` `<arg>`|Quick redefine that sets %{ARG} for use in `RUN*_ARG` scripts (if defined) |
 | `-q` \| `--quote`       |Quote all scripts and servers files|
-| `-S` \| `--SEPARATOR` `<str>` |The separation characters between folded and grouped items. (default is double space)|
+| `-S` \| `--separator` `<str>` |The separation characters between folded and grouped items. (default is double space)|
 | `-t` \| `--test` `<arg>` | Final test against a RUN (either before or after RUN_PRE) to validate the combination|
 | `-s` \| `--suit` `<suit>` |search for scripts only from this suit. You can also use the environment variable SUIT|
 | `-w` \| `--warnings` |Enable warnings when your script=server combination does not match anything. Set WARNINGS=1 in the configuration file to enable it by default|
 | `-o` \| `--on` `<host>` |Comma separated list of hosts (will create a serverfile for you) for `=#` |
-| `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#`|
-| `--query` `<var>`  |Prints the value of a variable defined in your evidencer.cfg and exits|
+| `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#` |
+| `-Q` \| `--query` `<var>` |Prints the value of a variable defined in your evidencer.cfg and exits |
+| `-V` \| `--version` | Prints the version and exits |
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
@@ -306,7 +307,7 @@ All variables that have to do with running found combinations of servers and scr
 |RUN_TEST|Execute this string in the shell to test the validity of the script+server combination. Exit nonzero to skip `RUN` (but `RUN_PRE` already ran if it was defined)|
 |RUN|Execute this string in the shell|
 |RUN_POST|Execute this string in the shell. Runs after `RUN`|
-|KEEP|Set to true(1) to keep temporal files created when `@hostnames` is used|
+|KEEP|Set to true(1) to keep temporal files created when `@hostnames` is used, like so: `./evidencer -r KEEP=1 script=servers`|
 |RUN_START|Run just before the first `RUN_PRE` is ran. If no scripts+servers is matched, then this does not trigger either|
 |RUN_FINISH|Runs at the very end of the evidencer script, only if `RUN_START` ran|
 |RUN_BEGIN|This always runs at the beginning|
@@ -611,6 +612,10 @@ Look up colorscodes by name on the web: https://jonasjacek.github.io/colors/
 Look up colorcodes on the terminal https://www.perturb.org/code/term-colors.pl
 
 To mark multiple words in a span, use a colon, like so: `<B:>`with the end tag `<:>`
+
+for background colors use `<n.>` and end with `<:>` (where n is a number)
+
+The featured colors are high intensity, for low intensity use `<1>`..`<8>`
 
 
 Note: `ssh-batch` skips all comments, so you are not increasing IO by adding good documentation.
