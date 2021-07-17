@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r120';
+my $VERSION = '0.9r121';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -34,14 +34,17 @@ my %BASECFG  = (
 	'C:B' => "\033[1m", # BOLD
 	'C:I' => "\033[3m", # ITALIC
 	'C:U' => "\033[4;37m", # UNDERLINE
+	'C:K' => "\033[2;30m", # BLACK
 	'C:R' => "\033[1;31m", # RED
 	'C:G' => "\033[1;32m", # GREEN
 	'C:Y' => "\033[1;33m", # YELLOW
 	'C:L' => "\033[1;34m", # BLUE
-	'C:P' => "\033[1;35m", # PURPLE (officially Fuchsia/Magenta)
+	'C:P' => "\033[1;35m", # PURPLE (officially Magenta)
 	'C:C' => "\033[1;36m", # CYAN
+	'C:W' => "\033[1;37m", # WHITE
+	'C:A' => "\033[2;37m", # GRAY
 	'C:Z' => "\033[7;1m", # INVERT
-	'C:A' => "\033[0;90m", # GRAY
+
 	'C:O' => "\033[38;5;208m", # ORANGE (might not be available on all terminals)
 	NOCOLORS => 0, # set to 2 in the evidencer.cfg file to totally disable colored help
 );
@@ -78,7 +81,7 @@ our %OPTIONS = (
 	'query=s@'      => \$BASECFG{QUERY},
 	'l|loop=s@'     => \$BASECFG{LOOP},
 	'o|on=s@'       => \$BASECFG{ON},
-	'version'       => \$opt_version,
+	'V|version'     => \$opt_version,
 );
 
 
@@ -233,8 +236,8 @@ if($opt_help && @ARGV && !$opt_complete) {
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		next unless @txt;
 		grep s/<(?:.|\d+):?>//g, @txt if $CFG{'NOCOLORS'};
-		grep s/<([BRUINGLYPCAZO])>(\S+)/$BASECFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
-		grep s/<(\w*):>/ $1 ? ( $1>0 ? "\033[38;5;${1}m" : "$BASECFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>
+		grep s/<([BRUINGLYPCAZOWK])>(\S+)/$BASECFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
+		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$BASECFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>  #<123.> BGCOLOR
 		grep s/<(\d+)>(\S+)/\033[38;5;${1}m$2$BASECFG{'C:N'}/g, @txt; # <123>word
 		say "\n=== " . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:B'}) . "${title}" . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:N'}) . " ===\n";
 		say join "\n", grep { s/^#\+?:// } @txt;
@@ -1392,6 +1395,7 @@ or each of these and a RUN_ABORT when file IO fails.
  -o | --on <host>   Comma separated list of hosts (will create a serverfile for you) for =#
  -l | --loop <$>    Loop on comma separated list of serverfiles for =#
  --query <var>      Prints the value of a variable defined in your evidencer.cfg and exits
+ -V | --version     Prints the version and exits
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
