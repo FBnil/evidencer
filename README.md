@@ -370,7 +370,7 @@ RUN=%{BASEDIR}/bin/ssh-batch %{RUNSERVERFQ} -- %{RUNSCRIPTSDIR}/HEADER.sh %{RUNS
 |TOTALTIME|Total seconds running the evidencer script|
 
 The time is localtime by default, but it can be `UTC` if you define it like true-ish in your evidencer.cfg file:
-`UTC=1`
+`UTC=1` you can also use the `--UTC` commandline parameter
 
 ### Test case run (RUN_PRE, RUN, RUN_POST)
 These run for each test (a valid script and server combination). Everthing written will be executed by the shell. You can use `%{ }` variables to be expanded just before it runs.
@@ -640,7 +640,7 @@ Tip: the newest file in `./servers/` is aliased to `#`, so to run a script on al
 
 Evidencer features tab expansion for aliases that start with `/`, for suits if you start with `-s` and for scripts. There are stops at each `.`, so if you have scripts that start with `get.*` and `set.*`, you would see `get.` and `set.` as suggestions.
 
-You can activate tab expansion for evidencer by putting the following in your `~/.bashrc` file:
+You can activate tab expansion for evidencer by running the following to append it to your `~/.bashrc` file:
 
 `./evidencer --complete >> ~/.bashrc`
 
