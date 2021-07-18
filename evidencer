@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r122';
+my $VERSION = '0.9r123';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -728,7 +728,7 @@ for my $argv (@ARGV) {
 				if ( !defined $RICH{ $CFG{'RUNSERVERFQ'} } ) {
 
 			# read file if we havent done so, and check if it contains nested files, or sidecomments
-					readfiletoarray( $CFG{RUNSERVERFQ} );
+					readfiletoarray( $CFG{RUNSERVERFQ}, 0 );
 
 					if ( $CFG{'UNFOLDED'} || $CFG{'RICH'} ) {
 						$RICH{ $CFG{'RUNSERVERFQ'} } = 1;
@@ -741,10 +741,11 @@ for my $argv (@ARGV) {
 
 			if ( defined $SCRIPT_FILES{$suitscript}{'!'} ) {
 				say "###$script:opening $CFG{RUNSERVERFQ} for $CFG{RUNSCRIPTFQ}" if $CFG{'DEBUG'};
-				my @read_servers = readfiletoarray( $CFG{'RUNSERVERFQ'} );
+				my @read_servers = readfiletoarray( $CFG{'RUNSERVERFQ'}, 0 );
 				my @servers;
 				my $counter = 0;
-				while ( $_ = shift @read_servers ) {
+				my %SEEN;
+				while ( ($_ = shift @read_servers) && !$SEEN{$_}++) {
 					chomp;
 					my $found = 0;
 					++$counter;
@@ -1325,7 +1326,7 @@ If you --bundle or --fold you might want to use the + concated scripts names, in
 
 =item B<TEST>
 
-Argument string given with --test on the commandline (available as %{TEST}). It can be used in your RUN_PRE_TEST or RUN_TEST (and RUN_POST_TEST), which only activate when --test is used
+Argument string given with --test on the commandline (available as %{TEST}). It can be used in your RUN_PRE_TEST or RUN_TEST (and RUN_POST_TEST), which only activate when --test is used. If it does not exit with exitcode 0, then running the rest is skipped.
 
 =item B<RUN_PRE_TEST>
 
