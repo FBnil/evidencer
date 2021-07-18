@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r123';
+my $VERSION = '0.9r124';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -1100,7 +1100,6 @@ sub getdir
 sub redefine
 {
 	my $n=-1;
-	#@{ $CFG{'REDEFINE'} } = grep defined, @{ $CFG{'REDEFINE'} }; # remove undef elements
 	for my $redef ( @{ $CFG{'REDEFINE'} } ) {
 		++$n;
 		next unless defined $redef;
@@ -1394,32 +1393,32 @@ So the order is: RUN_START, RUN_BEGIN, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN
 
  -h | --help | -?   Print Options and Arguments.
  --man              Print complete man page.
- -v | --verbose     Log more to the screen
- -D | --DEBUG       Log a bit more to the screen
- -d | --dryrun      Do not execute, but show all that would have been run
- -U | --UTC         timestrings are in UTC instead of localtime
+ -v | --verbose     Log more to the screen. Sets VERBOSE=1
+ -D | --DEBUG       Log a bit more to the screen. Sets DEBUG=1
+ -d | --dryrun      Do not execute, but show all that would have been run. Sets DRYRUN=1
+ -U | --UTC         timestrings are in UTC instead of localtime. Sets UTC=1
  -C | --createdirs  Create directories if they do not exist
  -c | --config <cfg> Read alternative cfg file
  -k | --keep        Do not cleanup temporal files created to accomodate the @hostnames list
- -n | --noautofix   Do not skip running tests on servergroups that match multiple tests
- -u | --unfold      If you have files in your servergroups, recursively read the servers.
- -f | --fold        Group by Scripts
- -g | --group       Group by Servergroups
- -b | --bundle      Concatenate all scripts/servers if they are folded or grouped, into a new file
+ -n | --noautofix   Do not skip running tests on servergroups that match multiple tests. Sets NOAUTOFIX=1
+ -u | --unfold      If you have files in your servergroups, recursively read the servers. Sets UNFOLD=1
+ -f | --fold        Group by Scripts. Sets FOLD=1
+ -g | --group       Group by Servergroups. Sets GROUP=1
+ -b | --bundle      Concatenate all scripts/servers if they are folded or grouped, into a new file. Sets BUNDLE=1
  -r | --redefine  $ Override a variable from evidencer.cfg (can be used multiple times)
  -a | --argument  $ Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
  -q | --quote       Quote your scripts and servers using %{QUOTESTR}. Handy for fold and group.
- -S | --separator $ The separation characters between folded and grouped items. (default is double space)
+ -S | --separator $ The separation characters between folded and grouped items. (default is double space). Sets SEPARATOR
  -t | --test  <$>   Final test against a RUN (either before or after RUN_PRE) to validate the combination
  -s | --suit <suit> Only consider this suit for all script-server matches
- -w | --warnings    Enable warnings when your script=server combination does not match anything. 
+ -w | --warnings    Enable warnings when your script=server combination does not match anything. Sets WARNINGS=1
                     Set WARNINGS=1 in the configuration file to enable it by default
  -o | --on <host>   Comma separated list of hosts (will create a serverfile for you) for =#
  -l | --loop <$>    Loop on comma separated list of serverfiles for =#
  -Q | --query <var> Prints the value of a variable defined in your evidencer.cfg and exits
  -V | --version     Prints the version and exits
 
-Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
+Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled. Many options can also be set in the evidencer.cfg file.
 
 =head1 Query
 
