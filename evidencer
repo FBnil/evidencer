@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r126';
+my $VERSION = '0.9r127';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -204,7 +204,7 @@ sub doQuery{
 		}
 	}
 	say $_.'='.($CFG{$_}? xexpand($CFG{$_}, '%\{(\w+)\}', \%CFG ):"") for sort keys %found; # bug: /\033/\\033/g
-	say $_.'='.($CFG{'ALIAS'}{$_}? xexpand($CFG{$_},$CFG{'ALIAS'}{$_}, '%\{(\w+)\}', \%CFG ):"") for sort keys %found_alias;
+	say $_.'='.($CFG{'ALIAS'}{$_}? xexpand($CFG{'ALIAS'}{$_}, '%\{(\w+)\}', \%CFG ):"") for sort keys %found_alias;
 	&cleanup();
 	exit;
 }
