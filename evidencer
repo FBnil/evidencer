@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r124';
+my $VERSION = '0.9r126';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -188,8 +188,8 @@ readCFG( $CFGFILE ); # Read toplevel evidencer.cfg only for CFGDIR
 $BASECFG{'CFGDIR'} = $CFG{'CFGDIR'} if $CFG{'CFGDIR'} ne $BASECFG{'CFGDIR'};
 readCFG( $CFGFILE, $SUIT ) if $SUIT;
 
-# Get a single variable defined in the .cfg file, and print it out.
-if(defined $BASECFG{'QUERY'}){
+# Get variables defined in the .cfg file, and print them out.
+sub doQuery{
 	my @want;
 	$_=~/,/? push(@want, split(/\s*,\s*/, $_)):push(@want,$_)  for @{$BASECFG{'QUERY'}};
 	my %found;
@@ -203,10 +203,12 @@ if(defined $BASECFG{'QUERY'}){
 			++$found_alias{$w} if defined $CFG{'ALIAS'}{$w};
 		}
 	}
-	say $_.'='.($CFG{$_}? $CFG{$_}:"") for sort keys %found; # bug: /\033/\\033/g
-	say $_.'='.($CFG{'ALIAS'}{$_}? $CFG{'ALIAS'}{$_}:"") for sort keys %found_alias; 
+	say $_.'='.($CFG{$_}? xexpand($CFG{$_}, '%\{(\w+)\}', \%CFG ):"") for sort keys %found; # bug: /\033/\\033/g
+	say $_.'='.($CFG{'ALIAS'}{$_}? xexpand($CFG{$_},$CFG{'ALIAS'}{$_}, '%\{(\w+)\}', \%CFG ):"") for sort keys %found_alias;
+	&cleanup();
 	exit;
 }
+&doQuery() if defined $BASECFG{'QUERY'} && !@ARGV;
 
 %_CFG = UnDeepCopy( \%CFG );    # Backup real base configuration so each test can change it
 say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
@@ -482,7 +484,7 @@ if ( defined $BASECFG{'ON'} ) {
     push @{$BASECFG{'LOOP'}}, $tempserverfile;
 }
 
-runit('RUN_START');
+runit('RUN_START') unless defined $BASECFG{'QUERY'};
 
 # Split argument string into suit, scripts and hoststr (suit:scripts=+:hoststr)
 sub getSuitAndScriptsAndHostStr
@@ -804,8 +806,9 @@ for my $argv (@ARGV) {
 				push @DEFERARR, $CFG{'RUNSCRIPTFQ'}  unless (grep $_ eq $CFG{'RUNSCRIPTFQ'}, @DEFERARR);
 			} else {
 				$CFG{'RUNNAMES'} = $CFG{'RUNNAME'};
-				&executerun();
+				&executerun() unless defined $BASECFG{'QUERY'};
 			}
+			doQuery if defined $BASECFG{'QUERY'};
 		}
 	}
 }
@@ -897,12 +900,16 @@ if (%DEFER) {
 }
 
 # Remove all temporal files, unless KEEP is set
-if ( !$CFG{'KEEP'} ) {
-	for my $tmpfile ( @{ $CFG{'_CLEANUP'} } ) {
-		say "removing temporal file $tmpfile" if $CFG{'VERBOSE'};
-		unlink $tmpfile;
+sub cleanup{
+	if ( !$CFG{'KEEP'} ) {
+		for my $tmpfile ( @{ $CFG{'_CLEANUP'} } ) {
+			say "removing temporal file $tmpfile" if $CFG{'VERBOSE'};
+			unlink $tmpfile;
+		}
 	}
 }
+
+&cleanup();
 
 runit('RUN_END') if $BASECFG{'RUN_BEGAN'};
 runit('RUN_FINISH');
