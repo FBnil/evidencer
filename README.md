@@ -30,7 +30,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-g` \| `--group` |Group by Servergroups|
 | `-b` \| `--bundle` |Concatenate all scripts/servers if they are folded or grouped|
 | `-r` \| `--redefine` `<var=val>`|Override a variable from evidencer.cfg (can be used multiple times)|
-| `-a` \| `--argument` `<arg>`|Quick redefine that sets %{ARG} for use in `RUN*_ARG` scripts (if defined) |
+| `-a` \| `--argument` `<arg>`|Quick redefine that sets `%{ARG}` for use in `RUN*_ARG` scripts (if defined) |
 | `-q` \| `--quote`       |Quote all scripts and servers files|
 | `-S` \| `--separator` `<str>` |The separation characters between folded and grouped items. (default is double space)|
 | `-t` \| `--test` `<arg>` | Final test before a RUN_PRE, RUN and RUN_POST, to validate the combination. You will need RUN*_TEST defined. And if any of those exit with nonzero exitcode, running the rest is aborted.|
@@ -39,7 +39,9 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-o` \| `--on` `<host>` |Comma separated list of hosts (will create a serverfile for you) for `=#` |
 | `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#` |
 | `-Q` \| `--query` `<var>` |Prints the value of a variable defined in your evidencer.cfg and exits |
-| `-V` \| `--version` | Prints the version and exits |
+| `-V` \| `--version` | Prints the real file location and version and exits |
+| `-F` \| `--force` | USR Modifier (boolean). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set |
+| `-e` \| `--extra` | USR Modifier (string). Use inside your .cfg as: `"${EXTRA}"` |
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
@@ -65,7 +67,10 @@ The behavior is similar to `--on`, but the given parameters are serversfiles ins
 - `./temp/`    Directory used when you use `@hostnames_regexp` (and temporal files need to be created to filter and merge)
 
 Tip: to create the top-level directories (except ./temp/ which you might want to redefine in a configuration first) use the following command:
-`./evidencer -s .. -C`
+`./evidencer -s .. -C` (or `./evidencer -Cs ..`)
+
+If you have `SUIT_LINK=1` and/or `SUIT_CFG=1` in your configuration file, then evidencer will be symlinked into that directory and/or the evidencer.cfg file will be copied into the new suit.
+
 
 ## Example
 Say you have the following servergroups (files that contain servernames/ipadresses on each line)

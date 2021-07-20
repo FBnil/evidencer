@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r131';
+my $VERSION = '0.9r132';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -18,7 +18,12 @@ my %RICH;     # for forcing a new servergroup file
 my %CFG;      # Variable configuration
 my %_CFG;     # BASE configuration
 my $MELINKED = -l $0;    # holds if the current file is a symlink (changes behavior)
-my $me = dirname( abs_path( $MELINKED ? dirname($0).'/'.readlink($0) : $0 ) ) . '/' . basename($0);
+my $me;
+{
+	my $lnk = $MELINKED? readlink($0) : '';
+	my $abslnk = $lnk =~m{^/};
+	$me	= dirname( abs_path( $MELINKED ? ($abslnk? '' : dirname($0).'/').$lnk : $0 ) ) . '/' . basename($0);
+}
 my %BASECFG  = (
 	PID       => $$,
 	N         => 0,
@@ -70,6 +75,8 @@ our %OPTIONS = (
 	'n|noautofix'   => \$BASECFG{NOAUTOFIX},
 	'u|unfold'      => \$BASECFG{UNFOLD},
 	'f|fold'        => \$BASECFG{FOLD},
+	'F|force'       => \$BASECFG{FORCE},
+	'e|extra=s'     => \$BASECFG{EXTRA},
 	'g|group'       => \$BASECFG{GROUP},
 	'b|bundle'      => \$BASECFG{BUNDLE},
 	'r|redefine=s@' => \$BASECFG{REDEFINE},
@@ -464,6 +471,29 @@ if ( $CFG{'CREATEDIRS'} ) {
 	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT );
 	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
 	say "$c directories created";
+	if(defined $CFG{'SUIT_LINK'} && $CFG{'SUIT_LINK'}){
+		my $sfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0);
+		#my $r=symlink $me, $sfile; # symlink with absolute path
+		my $r=symlink '../../'.basename($0), $sfile; # relative path (looks better when ls -l)
+		if($r==1){
+			say "symlinked $sfile"
+		}else{
+			say "ERROR: Could not create symlink\n $sfile\nfor\n $me\n $!"
+		}
+	}
+	if(defined $CFG{'SUIT_CFG'} && $CFG{'SUIT_CFG'} && $CFG{'CFGFILE'} && -r $CFG{'CFGFILE'}){
+		my $cfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0).'.cfg';
+		if(open(my $FOUT, '>', $cfile )){
+			if(open(my $FIN,'<',$CFG{'CFGFILE'})){
+				print $FOUT $_ while($_=<$FIN>);
+				say "cfg copied $cfile";
+				close $FIN;
+			}
+			close $FOUT;
+		}else{
+			say "ERROR: Could not write cfg file $cfile $!";
+		}
+	}
 	exit 0;
 }
 
@@ -1200,6 +1230,9 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
 
 ./tmp/      A temporal directory to hold sub lists of servergroups when using hostnames_regexp
 
+Note: You can edit evidencer.cfg beforehand to redefine these directory names. See section CONFIGURATION
+
+
 to create the top-level directories use the following command: 
 
 ./evidencer -s .. -C
@@ -1208,7 +1241,9 @@ To create a suits directory structure:
 
 ./evidencer -C -s MYAPPL
 
-Note: You can edit evidencer.cfg beforehand to redefine these directory names. See section CONFIGURATION
+If you have SUIT_LINK=1 and/or SUIT_CFG=1 in your configuration file, then evidencer will be symlinked into that directory and/or the evidencer.cfg file will be copied into the new suit.
+
+
 
 =head1 CONFIGURATION Variables
 
@@ -1424,7 +1459,9 @@ So the order is: RUN_START, RUN_BEGIN, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN
  -o | --on <host>   Comma separated list of hosts (will create a serverfile for you) for =#
  -l | --loop <$>    Loop on comma separated list of serverfiles for =#
  -Q | --query <var> Prints the value of a variable defined in your evidencer.cfg and exits
- -V | --version     Prints the version and exits
+ -V | --version     Prints the real file location and version and exits
+ -F | --force       USR Modifier (boolean). Use inside your .cfg as: ${FORCE}. Pre set FORCE=0 in cfg
+ -e | --extra       USR Modifier (string). Use inside your .cfg as: "${EXTRA}"
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled. Many options can also be set in the evidencer.cfg file.
 
