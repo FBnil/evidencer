@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r128';
+my $VERSION = '0.9r131';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -376,7 +376,7 @@ if ($opt_complete)
 
 	my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } getdir(${SUITDIR}.$CFG{'SERVERS'});
 
-	$search =~ s/[.]/\\./; # escape dot
+	$search =~ s/[.]/\\./g; # escape dots
 	if ( !$search ) {
 		# If we have nothing yet, suggest methods up until the first point (if they have)
 		my @M = @methods;
