@@ -163,6 +163,24 @@ last reboot |head -4
 
 EOF
 
+cat << 'EOF' > ./scripts/os.show.mem=+
+#!/usr/bin/env bash
+
+cd /sys/devices/system && echo $((
+    $(grep -x online memory/memory[0-9]*/state|wc -l)
+    * 0x$(cat memory/block_size_bytes)
+    / 1024**3 ))"G" || /usr/bin/lsmem |grep 'Total online memory' |awk '{print $4}'
+
+#: Shows the amount of <B>RAM a machine has.
+#+: 
+#+: The difficulty in getting the RAM is because /proc/meminfo reports the total memory 
+#+: AFTER the kernel memory has been substracted (around 300KB). So it might seem like 
+#+: these work, but they are wonky:
+#=: <L:>echo $((($(awk '/MemTotal/ {print $2}' /proc/meminfo)+350000)/1024/1024))<:>
+#!: <Y>source: <A>https://toroid.org/linux-physical-memory
+
+EOF
+
 
 chmod +x scripts/*
 

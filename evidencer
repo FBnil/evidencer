@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r127';
+my $VERSION = '0.9r128';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -247,8 +247,9 @@ if($opt_help && @ARGV && !$opt_complete) {
 		grep s/<([BRUINGLYPCAZOWK])>(\S+)/$BASECFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
 		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$BASECFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>  #<123.> BGCOLOR
 		grep s/<(\d+)>(\S+)/\033[38;5;${1}m$2$BASECFG{'C:N'}/g, @txt; # <123>word
+		grep s/^#([\!\=]):(.*)$/"#:\n$2".($1 eq "!"?"\n":"")/e, @txt; # titles and notes
 		say "\n=== " . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:B'}) . "${title}" . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:N'}) . " ===\n";
-		say join "\n", grep { s/^#\+?:// } @txt;
+		say join "\n", grep { s/^#.?:// } @txt;
 		say "";
 	}
 	}
@@ -1471,6 +1472,9 @@ You can put this variable also in your evidencer.cfg file:
 # NOCOLORS=1    # Only headers are bold, the rest is monochromatic
 
 # NOCOLORS=2    # fully monochromatic, useful for storing in a text file.
+
+If you start your help with: #=:  It means it starts a new paragraph (adds a newline above).
+If you start your help with: #!:  It means the line is separated by a newline above and below.
 
 =head1 TAB EXPANSION
 

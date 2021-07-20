@@ -33,7 +33,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-a` \| `--argument` `<arg>`|Quick redefine that sets %{ARG} for use in `RUN*_ARG` scripts (if defined) |
 | `-q` \| `--quote`       |Quote all scripts and servers files|
 | `-S` \| `--separator` `<str>` |The separation characters between folded and grouped items. (default is double space)|
-| `-t` \| `--test` `<arg>` | Final test against a RUN (either before or after RUN_PRE) to validate the combination|
+| `-t` \| `--test` `<arg>` | Final test before a RUN_PRE, RUN and RUN_POST, to validate the combination. You will need RUN*_TEST defined. And if any of those exit with nonzero exitcode, running the rest is aborted.|
 | `-s` \| `--suit` `<suit>` |search for scripts only from this suit. You can also use the environment variable SUIT|
 | `-w` \| `--warnings` |Enable warnings when your script=server combination does not match anything. Set WARNINGS=1 in the configuration file to enable it by default|
 | `-o` \| `--on` `<host>` |Comma separated list of hosts (will create a serverfile for you) for `=#` |
@@ -42,6 +42,19 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-V` \| `--version` | Prints the version and exits |
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
+
+## ON
+
+By itself, the `#` means the newest ./servers/ file. But combined with a `--on`, then the meaning changes to: Create a new file with the default name `tmp.lst` (which name you can override by defining `TMPFILE`), put all servernames there, and (because it is now the latest file), run the script(s) on that serversfile.
+
+`./evidencer test=\# -o host1,host2 -o host3`
+
+## LOOP
+
+The behavior is similar to `--on`, but the given parameters are serversfiles inside ./servers/
+
+`./evidencer test=\# -l serverlist1,serverlist2 -o serverlist3`
+
 
 ## Directories
 
@@ -511,6 +524,10 @@ Or set to zero if you do not want quoting (the default, but it could be enabled 
 We have a script: evidencer.sh that does the basics, and might be just enough. Create a subdirectory `scripts` and a subdirectory `servers`:
 
 ```sh
+cfg=evidencer.cfg
+if [ -r "$cfg" ];then
+	source "$cfg"
+fi
 SCRIPT=$1
 IFS='=' read -ra ARR <<< "$SCRIPT"
 SERVERGROUP=$(echo "${ARR[1]}"|sed 's/++/*-*/g'|tr '+' '*')
@@ -616,6 +633,9 @@ To mark multiple words in a span, use a colon, like so: `<B:>`with the end tag `
 for background colors use `<n.>` and end with `<:>` (where n is a number)
 
 The featured colors are high intensity, for low intensity use `<1>`..`<8>`
+
+Additionally to the extended help `#+:`, there is also `#=:`  It means it starts a new paragraph (adds a newline above).
+And `#!:`  It means the line is separated by a newline above and below.
 
 
 Note: `ssh-batch` skips all comments, so you are not increasing IO by adding good documentation.
