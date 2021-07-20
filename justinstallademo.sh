@@ -166,10 +166,7 @@ EOF
 cat << 'EOF' > ./scripts/os.show.mem=+
 #!/usr/bin/env bash
 
-cd /sys/devices/system && echo $((
-    $(grep -x online memory/memory[0-9]*/state|wc -l)
-    * 0x$(cat memory/block_size_bytes)
-    / 1024**3 ))"G" || /usr/bin/lsmem |grep 'Total online memory' |awk '{print $4}'
+cd /sys/devices/system && echo $(( $(grep -x online memory/memory[0-9]*/state|wc -l) * 0x$(cat memory/block_size_bytes) / 1024**3 ))"G" || /usr/bin/lsmem |grep 'Total online memory' |awk '{print $4}'
 
 #: Shows the amount of <B>RAM a machine has.
 #+: 
