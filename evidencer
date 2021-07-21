@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r132';
+my $VERSION = '0.9r133';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -22,7 +22,7 @@ my $me;
 {
 	my $lnk = $MELINKED? readlink($0) : '';
 	my $abslnk = $lnk =~m{^/};
-	$me	= dirname( abs_path( $MELINKED ? ($abslnk? '' : dirname($0).'/').$lnk : $0 ) ) . '/' . basename($0);
+	$me = dirname( abs_path( $MELINKED ? ($abslnk? '' : dirname($0).'/').$lnk : $0 ) ) . '/' . basename($0);
 }
 my %BASECFG  = (
 	PID       => $$,
@@ -76,7 +76,8 @@ our %OPTIONS = (
 	'u|unfold'      => \$BASECFG{UNFOLD},
 	'f|fold'        => \$BASECFG{FOLD},
 	'F|force'       => \$BASECFG{FORCE},
-	'e|extra=s'     => \$BASECFG{EXTRA},
+	'E|extra=s'     => \$BASECFG{EXTRA},
+	'e|export=s@'   => \$BASECFG{EXPORT},
 	'g|group'       => \$BASECFG{GROUP},
 	'b|bundle'      => \$BASECFG{BUNDLE},
 	'r|redefine=s@' => \$BASECFG{REDEFINE},
@@ -175,6 +176,8 @@ sub readCFG
 			$_.=$_[0] while($_=~s/\\$// && chomp($_[0]=<$CFG>));
 			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/) {
 				$CFG{'ALIAS'}{$1} = $2;
+			}elsif(/^EXPORT\s*=\s*(.*)\s*$/){
+				push @{$CFG{'EXPORT'}}, $1;
 			} else {
 				my ( $k, $v ) = split /=/, $_, 2;
 				$v = xexpand( $v, '%\{(\w+)\}', \%CFG ) if index( $v, "%{" ) > -1;
@@ -977,6 +980,7 @@ sub executerun
 	$CFG{'N'} = $BASECFG{'N'} += 1;    # Unique counter %{N} (combine with %{PID} to create tempfiles)
 	my $EC;
 	my $REDO = defined $CFG{'REDO'} ? $CFG{'REDO'} : 0;
+	&export() if defined $CFG{'EXPORT'};
 	for my $run ( glob "{RUN}{_PRE,,_POST}{_TEST,}" ) {
 		next if $run =~ /_TEST$/ && !defined $CFG{'TEST'};
 	  REDO:
@@ -1172,6 +1176,31 @@ sub redefine
 			# $BASECFG{ $_[0] } = $_[1]; 
 		}
 		$_CFG{ $_[0] } = $CFG{ $_[0] } = $_[1];
+	}
+}
+
+sub export{
+	my $n=-1;
+	for my $var ( @{ $CFG{'EXPORT'} } ) {
+		++$n;
+		next unless defined $var;
+		$var=~s/^\s+|\s+$//g; # trim
+		next unless $var;
+		# for: ./evidencer -e RUNSCRIPT,RUNSCRIPTFQ
+		if ( index( $var, "," ) > -1 ) {
+			my $_var = $var;
+			@_ = split /,/, $_var;
+			$var = shift @_;
+			push @{ $CFG{'EXPORT'} }, @_;
+		}
+		if($var=~m{^/(.+)/$}){
+			my $_var = $1;
+			for my $k (grep {/$_var/ } keys %CFG){
+				$ENV{$k} = $CFG{$k} || '';
+			}
+		}else{
+			$ENV{$var} = $CFG{$var} || '';
+		}
 	}
 }
 __END__
@@ -1460,8 +1489,9 @@ So the order is: RUN_START, RUN_BEGIN, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN
  -l | --loop <$>    Loop on comma separated list of serverfiles for =#
  -Q | --query <var> Prints the value of a variable defined in your evidencer.cfg and exits
  -V | --version     Prints the real file location and version and exits
+ -e | --export <$>  Name of the variables to export to processes using the `RUN*` executes
+ -E | --extra       USR Modifier (string). Use inside your .cfg as: "${EXTRA}"
  -F | --force       USR Modifier (boolean). Use inside your .cfg as: ${FORCE}. Pre set FORCE=0 in cfg
- -e | --extra       USR Modifier (string). Use inside your .cfg as: "${EXTRA}"
 
 Options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled. Many options can also be set in the evidencer.cfg file.
 

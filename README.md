@@ -40,8 +40,9 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#` |
 | `-Q` \| `--query` `<var>` |Prints the value of a variable defined in your evidencer.cfg and exits |
 | `-V` \| `--version` | Prints the real file location and version and exits |
+| `-e` \| `--export` | Name of the variables to export to processes using the `RUN*` |
+| `-E` \| `--extra` | USR Modifier (string). Use inside your .cfg as: `"${EXTRA}"` |
 | `-F` \| `--force` | USR Modifier (boolean). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set |
-| `-e` \| `--extra` | USR Modifier (string). Use inside your .cfg as: `"${EXTRA}"` |
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
@@ -682,3 +683,21 @@ Sometimes expansion does not work, check that there is no other expansion for th
 Tip: For expansion to work, you need to type the beginning of words, if you have a substring, append a `+` then press tab to expand using substring searching.
 
 Note: Tab Expansion is still a bit wonky here and there. (for example, if you go back to left with the cursor, or if you used parameters)
+
+## EXPORT
+
+You can keep your configuration clean by instead of running bash code directly, you isolate it into a script;
+and pass the variables required through the `EXPORT` variable, like so:
+
+`EXPORT=BASEDIR,SILENCE,OUTPUTDIR,RUNSERVERFQ,RUNSCRIPTFQ,OUTPUTLOG`
+`RUN=%{RUNSCRIPTSDIR}/run.sh`
+
+You can also use a regexp:  `EXPORT=/RUN/` will export all variables that contain "RUN" in their name.
+
+From the commandline it looks like this:
+
+`./evidencer script=serversfile -e /RUN/,BASEDIR`
+
+Note that `-e` always ADDs to the existing `EXPORT` defined in the cfg. To replace it use `-r EXPORT=BASEDIR,/RUN/`
+
+TIP: While debugging you can export all variables if you use `-e /./`
