@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r133';
+my $VERSION = '0.9r134';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -182,6 +182,7 @@ sub readCFG
 				my ( $k, $v ) = split /=/, $_, 2;
 				$v = xexpand( $v, '%\{(\w+)\}', \%CFG ) if index( $v, "%{" ) > -1;
 				$v = abs_path($v) if $DIRS{$k};
+				$v=~s/\\033/\033/ if $k=~/^C:/;
 				$CFG{$k} = $v unless $DONOTOVERRIDE{$k} && defined $CFG{$k};
 			}
 		}
@@ -253,9 +254,9 @@ if($opt_help && @ARGV && !$opt_complete) {
 		my ($title) = split /=/, $k;
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		next unless @txt;
-		grep s/<(?:.|\d+):?>//g, @txt if $CFG{'NOCOLORS'};
-		grep s/<([BRUINGLYPCAZOWK])>(\S+)/$BASECFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
-		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$BASECFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>  #<123.> BGCOLOR
+		grep s/<(?:.|\d+)[:.]?>//g, @txt if $CFG{'NOCOLORS'};
+		grep s/<([A-Z_])>(\S+)/$CFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
+		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$CFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>  #<123.> BGCOLOR
 		grep s/<(\d+)>(\S+)/\033[38;5;${1}m$2$BASECFG{'C:N'}/g, @txt; # <123>word
 		grep s/^#([\!\=]):(.*)$/"#:\n$2".($1 eq "!"?"\n":"")/e, @txt; # titles and notes
 		say "\n=== " . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:B'}) . "${title}" . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:N'}) . " ===\n";

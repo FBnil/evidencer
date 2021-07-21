@@ -88,7 +88,9 @@ fi
 
 for t in a.spoon a.fork the.knife ;do
 	s=scripts/get.${t}=+
-	echo -e "echo '${e}=+'\n" > $s
+	echo -e "#!/usr/bin/bash'\n" > $s
+	echo -e "# A normal comment (will not be shown but it will be word-searched)\n" > $s
+	echo -e "echo 'I am getting ${t}. You are running: ${s}'\n" > $s
 	echo -e "#: This script fetches $(echo ${t}|tr '.' ' ') from the <B>cupboard. \n" >> $s
 	echo -e "#: <R>Warning: You might need to replenish your cupboard when empty.\n" >> $s
 	echo -e "#+: <Y>Usage: <L>./evidencer <L>get.${t}=# \n" >> $s
@@ -127,6 +129,7 @@ echo -e "127.0.0.1" > servers/localhost
 cat << 'EOF' > ./scripts/os.show.boottime=+
 #!/usr/bin/env bash
 ARG=$1
+#ARG2=$2 # unused
 
 _TZ=UTC
 if [ -z "$ARG" ];then
