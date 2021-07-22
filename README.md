@@ -643,6 +643,7 @@ The featured colors are high intensity, for low intensity use `<1>`..`<8>`
 Additionally to the extended help `#+:`, there is also `#=:`  It means it starts a new paragraph (adds a newline above).
 And `#!:`  It means the line is separated by a newline above and below.
 
+Note that <0> is not a color but the name of the script for which the help is being shown.
 
 Note: `ssh-batch` skips all comments, so you are not increasing IO by adding good documentation.
 

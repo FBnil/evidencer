@@ -93,7 +93,7 @@ for t in a.spoon a.fork the.knife ;do
 	echo -e "echo 'I am getting ${t}. You are running: ${s}'\n" > $s
 	echo -e "#: This script fetches $(echo ${t}|tr '.' ' ') from the <B>cupboard. \n" >> $s
 	echo -e "#: <R>Warning: You might need to replenish your cupboard when empty.\n" >> $s
-	echo -e "#+: <Y>Usage: <L>./evidencer <L>get.${t}=# \n" >> $s
+	echo -e "#+: <Y>Usage: <L>./evidencer <L><0>=# \n" >> $s
 	echo -e "#+:\n" >> $s
 	echo -e "#+: You can use the following text accents:\n" >> $s
 	echo -e "#+: <B><B>BOLD <I><I>ITALIC <N><N>Normal <U><U>UNDERLINE <R><R>RED <G><G>GREEN <Y><Y>YELLOW\n" >> $s
@@ -127,6 +127,7 @@ cd suits/DEMO
 
 echo -e "127.0.0.1" > servers/localhost
 
+echo "Extracting ./scripts/os.show.boottime=+"
 cat << 'EOF' > ./scripts/os.show.boottime=+
 #!/usr/bin/env bash
 ARG=$1
@@ -158,15 +159,16 @@ echo $((TZ=${_TZ} who -b||TZ=${_TZ} uptime -s) | sed -e 's/^[[:space:]]*//') $AR
 #: The default TimeZone is <B>UTC, which you can change with a parameter.
 #: you can select from the following deprecated timezones:
 #: <B>CET <B>IST <B>EST <B>EST5EDT <B>PRC <B>ROC <B>ROK
-#+: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>CET
-#+: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>Europe/Lisbon
-#+: <C>See: <A>https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+#=: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>CET
+#=: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>Europe/Lisbon
+#=: <C>See: <A>https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 #+: So instead of <B>WET you need to use <B>Europe/Lisbon (although WET still works)
 
 last reboot |head -4
 
 EOF
 
+echo "Extracting ./scripts/os.show.mem=+"
 cat << 'EOF' > ./scripts/os.show.mem=+
 #!/usr/bin/env bash
 
@@ -182,6 +184,61 @@ cd /sys/devices/system && echo $(( $(grep -x online memory/memory[0-9]*/state|wc
 
 EOF
 
+
+echo "Extracting ./scripts/os.show.cpu=+"
+cat << 'EOF' > ./scripts/os.show.cpu=+
+#!/usr/bin/env bash
+
+lscpu | grep -e "^CPU(s):" | cut -f2 -d: | awk '{print $1}'
+#: Display the number of CPU's a (virtual)machine has.
+
+EOF
+
+echo "Extracting ./scripts/os.show.free=+"
+cat << 'EOF' > ./scripts/os.show.free=+
+#!/usr/bin/env bash
+ARG=$1
+
+if [ -z "$ARG" ];then
+        free -h
+else
+        free $@
+fi
+
+#: Show the Linux Memory Usage.
+#: The default is <B>-h, Human readable format, which you can change with a parameter.
+#=: See the manual for <B>free for all the options. Some options are:
+#+: <B>-b<:>, <B>--bytes Display the amount of memory in bytes.
+#+: <B>-k<:>, <B>--kibi  Display the amount of memory in kibibytes. (official default)
+#+: <B>-g<:>, <B>--gibi  Display the amount of memory in gibibytes.
+#+: <B>--giga      Display the amount of memory in gigabytes.
+#=: <Y>Example: <L:>./evidencer <0> -- -b<:>
+#=: <Y>Example: <L:>./evidencer <0> -- -k -w<:>
+
+EOF
+
+
+echo "Extracting ./scripts/os.show.uptime=+"
+cat << 'EOF' > ./scripts/os.show.uptime=+
+#!/usr/bin/env bash
+uptime $@
+
+#: Show the Linux uptime.
+#=: <Y>Example: <L:>./evidencer <0> -- -p<:>
+#=: Shows only the update in human readable format.
+
+EOF
+
+echo "Extracting ./scripts/POST"
+cat << 'EOF' > ./scripts/POST
+OUTPUTLOG=$1
+RUNSERVERFQ=$2
+OUTPUTDIR=$3
+for machine in $(cat $RUNSERVERFQ);do
+        cat $OUTPUTDIR/$machine |grep -v -e '<ssh_askpass>'
+done
+
+EOF
 
 chmod +x scripts/*
 
@@ -219,5 +276,13 @@ Using --man without any parameters gives you a pseudo man page.
 If your terminal does not support ANSI color codes, then use -r NOCOLORS=2 to print out the help:
 ./evidencer . -hvr NOCOLORS=2
 
+Remember the scripts extracted are in a suit called DEMO, so this is what you need to run:
+
+./evidencer -s DEMO -hv .
+
+or:
+
+cd suits/DEMO; ./evidencer . -hv
 
 EOF
+

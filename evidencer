@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r135';
+my $VERSION = '0.9r137';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -254,6 +254,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 		my ($title) = split /=/, $k;
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		next unless @txt;
+		grep s/<0>/$title/g, @txt;
 		grep s/<(?:.|\d+)[:.]?>//g, @txt if $CFG{'NOCOLORS'};
 		grep s/<([A-Z_])>(\S+)/$CFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
 		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$CFG{'C:'.$1}" ) : $BASECFG{'C:N'}/gex, @txt; #<123:> ... <:>  #<123.> BGCOLOR
@@ -472,8 +473,9 @@ if ( $CFG{'CREATEDIRS'} ) {
 	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT );
 	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
 	say "$c directories created";
-	if(defined $CFG{'SUIT_LINK'} && $CFG{'SUIT_LINK'}){
-		my $sfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0);
+
+	my $sfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0);
+	if(defined $CFG{'SUIT_LINK'} && $CFG{'SUIT_LINK'}  && $SUIT ne '..' && ! -f $sfile){
 		#my $r=symlink $me, $sfile; # symlink with absolute path
 		my $r=symlink '../../'.basename($0), $sfile; # relative path (looks better when ls -l)
 		if($r==1){
@@ -482,8 +484,8 @@ if ( $CFG{'CREATEDIRS'} ) {
 			say "ERROR: Could not create symlink\n $sfile\nfor\n $me\n $!"
 		}
 	}
-	if(defined $CFG{'SUIT_CFG'} && $CFG{'SUIT_CFG'} && $CFG{'CFGFILE'} && -r $CFG{'CFGFILE'}){
-		my $cfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0).'.cfg';
+	my $cfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0).'.cfg';
+	if(defined $CFG{'SUIT_CFG'} && $CFG{'SUIT_CFG'} && $CFG{'CFGFILE'} && -r $CFG{'CFGFILE'} && $SUIT ne '..' && ! -f $cfile){
 		if(open(my $FOUT, '>', $cfile )){
 			if(open(my $FIN,'<',$CFG{'CFGFILE'})){
 				print $FOUT $_ while($_=<$FIN>);
@@ -826,6 +828,8 @@ for my $argv (@ARGV) {
 				}
 			}
 
+			$CFG{'RUNNAMES'} = $CFG{'RUNNAME'} unless $DONOTOVERRIDE{'RUNNAMES'};
+
 			if ( $CFG{'FOLD'} || $CFG{'GROUP'} || $CFG{'BUNDLE'} ) {
 				say "Defering execution("
 				.($CFG{'FOLD'}?'F':'f')
@@ -837,7 +841,6 @@ for my $argv (@ARGV) {
 				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{'_'}} = UnDeepCopy(\%CFG);
 				push @DEFERARR, $CFG{'RUNSCRIPTFQ'}  unless (grep $_ eq $CFG{'RUNSCRIPTFQ'}, @DEFERARR);
 			} else {
-				$CFG{'RUNNAMES'} = $CFG{'RUNNAME'};
 				&executerun() unless defined $BASECFG{'QUERY'};
 			}
 			doQuery if defined $BASECFG{'QUERY'};
@@ -869,7 +872,8 @@ if (%DEFER) {
 			$DEFER{$str}{$k} = 1;
 		}
 	}
-	$CFG{'RUNNAMES'} = join '+', grep { s{.*/}{}; s{=.*}{}; } sort keys %DEFER;
+
+	$CFG{'RUNNAMES'} = join '+', grep { s{.\S*/}{}g; s{=\S*}{}g; s/\s+/+/g; } sort keys %DEFER unless $DONOTOVERRIDE{'RUNNAMES'};
 
 	for my $scripts ( $CFG{'FOLD'}? sort keys %DEFER : @DEFERARR) {
 		$CFG{'RUNSCRIPTFQ'} = $scripts;
@@ -971,7 +975,7 @@ sub executerun
 	}
 	if ( $CFG{'VERBOSE'} ) {
 		say "# RUN($CFG{'ARGV'}) $CFG{RUNSUIT}:$CFG{RUNSCRIPT} on $CFG{RUNSERVER}"
-		  . ( $CFG{'ARG'} ? " with argument '$CFG{ARG}'" : "" );
+		  . ( $CFG{'ARG'} ? " with argument '$CFG{ARG}'" : "" )." RUNNAME=$CFG{RUNNAME} RUNNAMES=$CFG{RUNNAMES}";
 		say "# SCRIPT=$CFG{RUNSCRIPTFQ}";
 		say "# SERVER=$CFG{RUNSERVERFQ}";
 	}
@@ -1540,6 +1544,7 @@ You can put this variable also in your evidencer.cfg file:
 
 If you start your help with: #=:  It means it starts a new paragraph (adds a newline above).
 If you start your help with: #!:  It means the line is separated by a newline above and below.
+Note that <0> is not a color but the name of the script for which the help is being shown
 
 =head1 TAB EXPANSION
 
