@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r134';
+my $VERSION = '0.9r135';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -256,7 +256,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 		next unless @txt;
 		grep s/<(?:.|\d+)[:.]?>//g, @txt if $CFG{'NOCOLORS'};
 		grep s/<([A-Z_])>(\S+)/$CFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
-		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$CFG{'C:'.$1}" ) : $BASECFG{'C:N'}/ge, @txt; #<123:> ... <:>  #<123.> BGCOLOR
+		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$CFG{'C:'.$1}" ) : $BASECFG{'C:N'}/gex, @txt; #<123:> ... <:>  #<123.> BGCOLOR
 		grep s/<(\d+)>(\S+)/\033[38;5;${1}m$2$BASECFG{'C:N'}/g, @txt; # <123>word
 		grep s/^#([\!\=]):(.*)$/"#:\n$2".($1 eq "!"?"\n":"")/e, @txt; # titles and notes
 		say "\n=== " . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:B'}) . "${title}" . ($CFG{'NOCOLORS'}>1? '':$BASECFG{'C:N'}) . " ===\n";
@@ -329,11 +329,11 @@ if ($opt_complete)
 	# $search =~s/\\=/=/; # remove backquote before equals, set by Completions
 	my $realsearch = $search;
 
-	# Process parameters that start with -
+	# Process parameters that start with - AND need a parameter
 	if ( $prev =~ m/^\-/ && (!$search || ($m > 0 && $search !~ m/^\-/ ))) {
 		my %P = map {@_=split(/\W+/); $_[0]=>1,$_[1]=>1} grep{/=/} keys %OPTIONS;
 		my $opt = $prev;
-		$opt=~s/^-//g;
+		$opt=~s/^-+//;
 		if ($P{$opt}){
 			# If needs argument, suggest something from the history (if written to)
 			# append to the history file immediately with history -a (user needs to do this in the shell)
@@ -341,15 +341,12 @@ if ($opt_complete)
  			my $bfile = "$ENV{HOME}/.bash_history";
  			if ( -r $bfile){
 				@candidates = grep {/$prev/} readfiletoarray($bfile,-1,"^\\S*".basename($0));
-				grep s/^.*$prev\s*(\S*).*/$1/,@candidates;
-				@candidates = grep { /^$search/} @candidates;
+				@candidates = grep {s/^.*$prev\s+(\S*).*/$1/} @candidates;
+				@candidates = grep { /^$search/ } @candidates;
 				say join ' ', @candidates;
 			}
-
-		}else{
-			say "";
+			exit;
 		}
-		exit;
 	}
 
 	if ( $search =~ m/^\-/ && $m >0) {

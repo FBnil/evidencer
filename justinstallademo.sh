@@ -100,12 +100,13 @@ for t in a.spoon a.fork the.knife ;do
 	echo -e "#+: <L><L>BLUE <P><P>PURPLE <C><C>CYAN <Z><Z>INVERT <A><A>GRAY <O><O>ORANGE\n" >> $s
 	echo -e "#+: You can also use numerical values:\n" >> $s
 	echo -e "#+: <165><165>Magenta2 <140><140>MediumPurple2 <99><99>SlateBlue1 <236><236>Grey19 <070><070>Chartreuse3\n" >> $s
-	echo -e "#+: Look up colorscodes by name on the web:\n" >> $s
+	echo -e "#=: Look up colorscodes by name on the web:\n" >> $s
 	echo -e "#+: <Y>URL: https://jonasjacek.github.io/colors/\n" >> $s
-	echo -e "#+: Look up colorcodes on the terminal:\n" >> $s
+	echo -e "#=: Look up colorcodes on the terminal:\n" >> $s
 	echo -e "#+: <Y>URL: <77:>https://www.perturb.org/code/term-colors.pl<:>\n" >> $s
-	echo -e "#+: To mark long use < B: > <B:>with the end tag <:> < : >" >> $s
+	echo -e "#=: To mark long use < B: > <B:>with the end tag <:> < : >" >> $s
 	echo -e "#+: All while leaving normal <xml> ... </xml> tags intact." >> $s
+	echo -e "#=: <4.>Blue Background<:> <11.><K:>Black on Yellow<:> <1.><Y>Yellow_on_red (one word <286.><G:><I>only<:>)" >> $s
 done
 
 cat << 'EOF' > scripts/header=+
