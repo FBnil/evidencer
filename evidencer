@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r137';
+my $VERSION = '0.9r138';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -397,8 +397,11 @@ if ($opt_complete)
 		}
 	} elsif ( $search !~ /=/ && $ARGV[ $ENV{'COMP_CWORD'} ] ne '=' ) {
 		my @M = @methods;
-		if($search=~s/\+/.*/g){
-			++$K{$_} for grep { /$search/ } @M;
+		if($search=~/\+/){
+			for my $fragment (split /\+/, $search){
+				@M = grep { /$fragment/ } @M if $fragment;
+			}
+			++$K{$_} for @M;
 		}else{
 			++$K{$_} for grep { s/^$search[^\.]*?\K\..*/\./ || /^$search/ } grep { /^$search/ } @M;
 		}
