@@ -46,6 +46,36 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
+## QUERY
+
+Query allows you to query any variable defined in the evidencer.cfg (or any cfg if you preload it with `-c`)
+You can also query ALIASes. Like many of the variables that accept multiple parameters, you can comma separate or issue multiple queries:
+
+`./evidencer -Q TIME -r 'TIME="%{YEAR}-%{MONTH}-%{DAY} %{HH}:%{MM} %{WD}/7 %{YD}/365 %{WN}/52"'`
+
+TIME="2021-07-17 23:56 6/7 198/365 29/52"
+
+
+`./evidencer -Q SCRIPTS,/q -Q NOW`
+
+NOW=${YEAR}-${MONTH}-${DAY}_${HH}:${MM}:${SS}
+
+SCRIPTS=scripts
+
+/q=&SILENCE=--quiet
+
+
+Additionally, if you add a test, it will fill in the variables:
+
+`./evidencer -s DEMO -Q RUN`
+
+RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "%{RUNRESULTSDIR}/${RUNNAMES}" %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > "%{RUNRESULTSDIR}/${RUNNAMES}-2021-07-23_1143.log"
+
+`./evidencer -s DEMO os.show.mem=# -Q RUN`
+
+RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}" /home/FBnil/evidencer/suits/DEMO/servers/localhost -- /home/FBnil/evidencer/suits/DEMO/scripts/os.show.mem=+ > "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}-2021-07-23_1142.log"
+
+
 ## ON
 
 By itself, the `#` means the newest ./servers/ file. But combined with a `--on`, then the meaning changes to: Create a new file with the default name `tmp.lst` (which name you can override by defining `TMPFILE`), put all servernames there, and (because it is now the latest file), run the script(s) on that serversfile.
@@ -555,7 +585,7 @@ make sure to test it out, and then modify the line with `#ACTION` to run what yo
 ./evidencer.sh *=*
 ```
 
-## Parameter completion
+## Parameter completion (TAB EXPANSION)
 Evidencer has rudimentary tab-completion:
 Add the following into your bashrc script and source it, or open a new terminal:
 ```
@@ -579,13 +609,15 @@ Sometimes expansion does not work, check that there is no other expansion for th
 
 tip: Make sure your ./scripts/ are executable (chmod +x) and have a '=' sign in their name.
 
-Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, add a plus to the end, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab, and if it's the only suggestion, then that is expanded in one go.
+Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, append a `+`, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab, and if it's the only suggestion, then that is expanded in one go. The `+` also works as an AND. So if you have found multiple scripts, add some other subtring that distinctly defines the test that you want after `+`, then press tab again. So if you have `get.a.spoon=+` and `os.show.boottime=+`, then `oo+` would find them both, and `oo+b` would only find the latter, and expand to that full script name.
+
+Note: Tab Expansion is still a bit wonky here and there. (for example, if you go back to left with the cursor, or if you used parameters)
 
 ## Build in Help
 
 You can add help comments in all scripts in ./scripts/, then, when you have a substring of a script, you can use `-h` to show only the help. Use `-hv` for extended help. To acomplish this you need to have lines that start with `#:` and the extended help lines need to start with `#+:`
 To show all help available, use a dot: `./evidencer . -hv` 
-(you can switch the order of the parameters)
+(you can switch the order of the parameters). Note that you NEED to add any expression (like a dot) or it will default to the internal usage help.
 
 If you do not want colors, use NOCOLORS, like so:
 
@@ -643,7 +675,11 @@ The featured colors are high intensity, for low intensity use `<1>`..`<8>`
 Additionally to the extended help `#+:`, there is also `#=:`  It means it starts a new paragraph (adds a newline above).
 And `#!:`  It means the line is separated by a newline above and below.
 
-Note that <0> is not a color but the name of the script for which the help is being shown.
+Note that <0> is not a color but the name of the script for which the help is being shown. And that <.> is the evidencer executable name. This way you can write a usage example that stays current, even if you happen to change your script's name, or renamed evidencer to something else.
+
+`#+: <Y>Example: <L:> ./<.> <0>=# <:>`
+
+
 
 Note: `ssh-batch` skips all comments, so you are not increasing IO by adding good documentation.
 
@@ -662,28 +698,6 @@ Tip: When working from within a suit, you do not need to add the "-s suit" or me
 Tip: the newest file in `./servers/` is aliased to `#`, so to run a script on all the server in that latest file:
 
 `./evidencer os.show.boottime=#`
-
-## TAB EXPANSION
-
-Evidencer features tab expansion for aliases that start with `/`, for suits if you start with `-s` and for scripts. There are stops at each `.`, so if you have scripts that start with `get.*` and `set.*`, you would see `get.` and `set.` as suggestions.
-
-You can activate tab expansion for evidencer by running the following to append it to your `~/.bashrc` file:
-
-`./evidencer --complete >> ~/.bashrc`
-
-(and when you do that for the first time, source your bashrc first, or open a new terminal)
-
-If you do not want to change your `.bashrc`, then run this to get tab expansion in your current terminal:
-
-`eval $(./evidencer --complete)`
-
-Sometimes expansion does not work, check that there is no other expansion for the binary defined:
-
-`complete |grep evidencer` and delete it with `complete -r evidencer` then try again.
-
-Tip: For expansion to work, you need to type the beginning of words, if you have a substring, append a `+` then press tab to expand using substring searching.
-
-Note: Tab Expansion is still a bit wonky here and there. (for example, if you go back to left with the cursor, or if you used parameters)
 
 ## EXPORT
 

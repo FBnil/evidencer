@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r138';
+my $VERSION = '0.9r139';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -255,6 +255,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
 		next unless @txt;
 		grep s/<0>/$title/g, @txt;
+		grep s/<\.>/basename($0)/ge, @txt;
 		grep s/<(?:.|\d+)[:.]?>//g, @txt if $CFG{'NOCOLORS'};
 		grep s/<([A-Z_])>(\S+)/$CFG{'C:'.$1}$2$BASECFG{'C:N'}/g, @txt; # <B>word
 		grep s/<(\w*)([:.])>/ $1 ? ( $1>0 ? "\033[".($2eq':'?38:48).";5;${1}m" : "$CFG{'C:'.$1}" ) : $BASECFG{'C:N'}/gex, @txt; #<123:> ... <:>  #<123.> BGCOLOR
@@ -1519,6 +1520,15 @@ SCRIPTS=scripts
 /q=&SILENCE=--quiet
 
 
+Additionally, if you add a test, it will fill in the variables:
+
+$ ./evidencer -s DEMO -Q RUN
+RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "%{RUNRESULTSDIR}/${RUNNAMES}" %{RUNSERVERFQ} -- %{RUNSCRIPTFQ} > "%{RUNRESULTSDIR}/${RUNNAMES}-2021-07-23_1143.log"
+
+$ ./evidencer -s DEMO os.show.mem=# -Q RUN
+RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}" /home/FBnil/evidencer/suits/DEMO/servers/localhost -- /home/FBnil/evidencer/suits/DEMO/scripts/os.show.mem=+ > "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}-2021-07-23_1142.log"
+
+
 =head1 SCRIPTS HELP
 
 The scripts can have lines that start with #: (viewable with -h) or #+: (viewable with -hv)
@@ -1547,7 +1557,9 @@ You can put this variable also in your evidencer.cfg file:
 
 If you start your help with: #=:  It means it starts a new paragraph (adds a newline above).
 If you start your help with: #!:  It means the line is separated by a newline above and below.
-Note that <0> is not a color but the name of the script for which the help is being shown
+Note that <0> is not a color but the name of the script for which the help is being shown (and <.> is the evidencer executable name)
+
+#+: <Y>Example: <L:> ./<.> <0>=# <:>
 
 =head1 TAB EXPANSION
 
