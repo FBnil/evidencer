@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+open (FFF,'>','log.log');
 use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case);
@@ -9,7 +10,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r139';
+my $VERSION = '0.9r140';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -328,8 +329,9 @@ if ($opt_complete)
 		}
 	}
 
-	# $search =~s/\\=/=/; # remove backquote before equals, set by Completions
+	my $wantservers = $search =~/=/ || $prev eq '='? 1 : 0;
 	my $realsearch = $search;
+say FFF "wantservers=$wantservers,realsearch=$realsearch,prev=$prev,n=$n,m=$m:$ENV{'COMP_CWORD'}";
 
 	# Process parameters that start with - AND need a parameter
 	if ( $prev =~ m/^\-/ && (!$search || ($m > 0 && $search !~ m/^\-/ ))) {
@@ -400,7 +402,7 @@ if ($opt_complete)
 		my @M = @methods;
 		if($search=~/\+/){
 			for my $fragment (split /\+/, $search){
-				@M = grep { /$fragment/ } @M if $fragment;
+				@M = grep { /$fragment/i } @M if $fragment;
 			}
 			++$K{$_} for @M;
 		}else{
@@ -449,7 +451,7 @@ if ($opt_complete)
 	}
 
 	# if we have more than 1 test, only display testnames, else also with servernames
-	if ( scalar keys %K > 1 ) {
+	if ( scalar keys %K > 1  && !$wantservers) {
 		say join " ", sort keys %K;
 	} else {
  		say join " ", sort keys %T;
@@ -640,8 +642,8 @@ sub getscripts
 			++$matches if $is_match;
 			say
 "check FIT argv: $argv script: $script scripts:$scripts\n scriptsreg: $scriptsreg scriptserver: $scriptserver\n"
-				. " server=$server  $scriptserver =~/ $scriptsreg / matches=$is_match"
-				if $CFG{'DEBUG'};
+				. " server=$server  $scriptserver =~/ $scriptsreg / matches=$matches"
+				if $CFG{'DEBUG'} && $is_match;
 			++$SCRIPT_FILES{ $suit . ':' . $script }{ $suit . ':' . $server } if $is_match;
 
 			if ($hoststr) {
@@ -845,9 +847,8 @@ for my $argv (@ARGV) {
 				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{'_'}} = UnDeepCopy(\%CFG);
 				push @DEFERARR, $CFG{'RUNSCRIPTFQ'}  unless (grep $_ eq $CFG{'RUNSCRIPTFQ'}, @DEFERARR);
 			} else {
-				&executerun() unless defined $BASECFG{'QUERY'};
+				&executerun();
 			}
-			doQuery if defined $BASECFG{'QUERY'};
 		}
 	}
 }
@@ -972,6 +973,7 @@ sub unalias
 
 sub executerun
 {
+	doQuery if defined $BASECFG{'QUERY'};
 	if ( $CFG{'ARG'} ) {
 		if ( ref $CFG{'ARG'} eq "ARRAY" ) {
 			$CFG{'ARG'} = join " ", @{ $CFG{'ARG'} };
@@ -987,7 +989,7 @@ sub executerun
 	my $EC;
 	my $REDO = defined $CFG{'REDO'} ? $CFG{'REDO'} : 0;
 	&export() if defined $CFG{'EXPORT'};
-	for my $run ( glob "{RUN}{_PRE,,_POST}{_TEST,}" ) {
+	for my $run ( glob "RUN{_PRE,,_POST}{_TEST,}" ) {
 		next if $run =~ /_TEST$/ && !defined $CFG{'TEST'};
 	  REDO:
 		if ( $CFG{'ARG'} && defined $CFG{ $run . "_ARG" } ) {
@@ -1463,7 +1465,7 @@ If you use arguments (either by adding a single argument with -a or using -- at 
 
 So the order is: RUN_START, RUN_BEGIN, RUN_PRE_TEST, RUN_PRE, RUN_TEST, RUN, RUN_POST_TEST, RUN_POST, RUN_END, ...(next test)... RUN_FINISH. and a *_FAIL for each of these and a RUN_ABORT when file IO fails.
 
-
+The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
 
 =head1 OPTIONS
 
@@ -1527,6 +1529,43 @@ RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "%{RUN
 
 $ ./evidencer -s DEMO os.show.mem=# -Q RUN
 RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}" /home/FBnil/evidencer/suits/DEMO/servers/localhost -- /home/FBnil/evidencer/suits/DEMO/scripts/os.show.mem=+ > "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}-2021-07-23_1142.log"
+
+
+=head1 REDEFINE
+
+You can redefine variables. If they are with an ! then they become unmutable and won't be overriden internally.
+
+Example:
+
+Say you have the following scripts: os.show.boottime os.show.cpu os.show.free os.show.uptime
+Then running ./evidencer os.show.+=localhost will have the RUNNAMES of:
+
+$ ./evidencer os.show.*=localhost  -Q RUNNAMES -f
+RUNNAMES=os.show.boottime+os.show.cpu+os.show.free+os.show.uptime
+
+And that would be a weird destination directory, but if you redefine it like this:
+
+$ ./evidencer os.show.*=localhost  -Q RUNNAMES -f -r RUNNAMES!=all_OS
+RUNNAMES=all_OS
+
+Then because of the RUN= ... --bg-log-dir "/home/nilton/CODE/PERL/evidencer/results/${RUNNAMES}" ...
+The results directory name is more comprehensible.
+
+Another trick is if you already fetched the information, and your RUN_POST shows you that information, then you can skip the RUN_PRE and RUN to only display the results you already have:
+
+$ ./evidencer os.show.cpu=localhost -r RUN= -r RUN_PRE=
+
+Which action you can ALIAS in your evidencer.cfg configuration file:
+
+# Undefine all actions except RUN_POST and RUN_END. This way, you can re-display the results  without fetching the data.
+
+# Use it like: ./evidencer /show test=serverlist   (note that the parameter order is important here)
+
+# or like: ./evidencer test=serverlist -r /show    (order is not important, -r is always first)
+
+ALIAS /show=&RUN!={,}&RUN_ARG!={,}&RUN_PRE!={,}&RUN_START!={,}&RUN_FINISH!={,}
+
+Note: For this to work, your post action should be configured to display something.
 
 
 =head1 SCRIPTS HELP

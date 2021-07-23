@@ -609,7 +609,7 @@ Sometimes expansion does not work, check that there is no other expansion for th
 
 tip: Make sure your ./scripts/ are executable (chmod +x) and have a '=' sign in their name.
 
-Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, append a `+`, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab, and if it's the only suggestion, then that is expanded in one go. The `+` also works as an AND. So if you have found multiple scripts, add some other subtring that distinctly defines the test that you want after `+`, then press tab again. So if you have `get.a.spoon=+` and `os.show.boottime=+`, then `oo+` would find them both, and `oo+b` would only find the latter, and expand to that full script name.
+Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, append a `+`, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab, and if it's the only suggestion, then that is expanded in one go. The `+` also works as an AND. So if you have found multiple scripts, add some other subtring that distinctly defines the test that you want after `+`, then press tab again. So if you have `get.a.spoon=+` and `os.show.boottime=+`, then `oo+` would find them both, and `oo+b` would only find the latter, and expand to that full script name. When you add an equal sign, then it starts searching for serversfiles that match your expression before the equals sign. So `+1=` would match servers for `TEST1=`
 
 Note: Tab Expansion is still a bit wonky here and there. (for example, if you go back to left with the cursor, or if you used parameters)
 
