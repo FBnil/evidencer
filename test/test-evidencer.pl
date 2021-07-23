@@ -27,6 +27,9 @@ createfile($cfgF,
   'RUN_ARG=echo "%{RUNSCRIPTFQ} on %{RUNSERVERFQ} with argument %{ARG}"'
 );
 
+
+
+
 system $exe '-c',"$TDIR/evidencer.cfg",'-C','-s','BUILDTEST';
 ok( $? == 0 , 'BUILDTEST directory structure' );
 
@@ -191,6 +194,26 @@ subtest 'Test accuracy of new regexp' => sub {
 	like($_[2], qr/BUILDTEST:TEST2=\+\+ET on VM-ET/, 'TEST2 accuracy test with new rexexp ET - multiple');
 };
 
+subtest 'Test completion' => sub {
+  plan tests => 8;
+ 	@_ = `COMP_CWORD=7 $exe --completion $cfg ./evidencer --complete evidencer +1 =`; # ./evidencer +1=
+	say @_;
+	is($#_,1-1,'Completion1: one lines of results');
+	like($_[0], qr/^TEST1=VM-ET TEST1=VM-PR$/, 'Completion1: test1 only matches 2');
+ 	@_ = `COMP_CWORD=7 $exe --completion $cfg ./evidencer --complete evidencer +2 =`; # ./evidencer +2=
+	say @_;
+	is($#_,1-1,'Completion2: one lines of results');
+	like($_[0], qr/^TEST2=VM-ET TEST2=VM-PR TEST2=VM-PR-DMZ$/, 'Completion2: test2 matches 3');
+ 	@_ = `COMP_CWORD=9 $exe --completion $cfg ./evidencer --complete evidencer +2 = +DMZ`; # ./evidencer +2=+DMZ
+	say @_;
+	is($#_,1-1,'Completion3: one lines of results');
+	like($_[0], qr/^VM-PR-DMZ$/, 'Completion3: DMZ matches 1');
+ 	@_ = `COMP_CWORD=9 $exe --completion $cfg ./evidencer --complete evidencer TEST1 = VM-ET`; # ./evidencer TEST1=VM-ET
+	say @_;
+	is($#_,1-1,'Completion4: one lines of results');
+	like($_[0], qr/^VM-ET$/, 'Completion4: VM-ET matches 1');
+};
+
 done_testing();
 
 sub createfile{
@@ -199,4 +222,5 @@ sub createfile{
   open(FI,'>',$fname) or BAIL_OUT($fname." ".$!);
   say FI $_ for @_;
   close(FI)  or BAIL_OUT($fname." ".$!);
+  chmod 0755, $fname; # scripts need to be executable
 }
