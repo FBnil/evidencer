@@ -10,7 +10,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r144';
+my $VERSION = '0.9r145';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -102,6 +102,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 	{no warnings; Getopt::Long::Configure("pass_through"); GetOptions(%OPTIONS) };
 	@ARGV = @_ARGV;
 }else{
+	my $num_args = $#ARGV;
 	# Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
 	if ( grep /^(?:\-\-|—)$/, @ARGV ) {
 		@_ = ();
@@ -113,10 +114,11 @@ if(defined $ENV{'COMP_CWORD'} ){
 
 	GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
 
+	die "$me Version $VERSION\n" if $opt_version || (!@ARGV && $BASECFG{VERBOSE} && $num_args < 1);
+
 	pod2usage( -verbose => 1 ) if defined $opt_help && !@ARGV;
 	pod2usage( -verbose => 2 ) if defined $opt_man;
 
-	die "$me Version $VERSION\n" if $opt_version;
 
 	# Make sure at least one argument provided
 	if ( !$opt_complete && !@ARGV && !$BASECFG{'CREATEDIRS'} && !$BASECFG{'QUERY'} ) {
