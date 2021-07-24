@@ -611,6 +611,17 @@ tip: Make sure your ./scripts/ are executable (chmod +x) and have a '=' sign in 
 
 Tab-completion starts from the beginning of each ./scripts/ file, if you know what you are looking for, append a `+`, and it will match the expression at any position. So if you have `get.the.spoon=+` then `spo+` finds the spoon with tab, and if it's the only suggestion, then that is expanded in one go. The `+` also works as an AND. So if you have found multiple scripts, add some other subtring that distinctly defines the test that you want after `+`, then press tab again. So if you have `get.a.spoon=+` and `os.show.boottime=+`, then `oo+` would find them both, and `oo+b` would only find the latter, and expand to that full script name. When you add an equal sign, then it starts searching for serversfiles that match your expression before the equals sign. So `+1=` would match servers for `TEST1=`
 
+If you run `justinstallademo.sh`, it will create a small suit called DEMO and fill the toplevel with some test script. You can play with test1, which matches only 1 serversscript, test2, which matches 2 and test3 which matches all three.
+
+You can also let evidencer expand things, for example: This expands to test3=VM-PR-DMZ
+
+./evidencer t+=+Z -dv |grep -e SCRIPT= -e SERVER=
+
+and this expands to: test1=VM-ET test2=VM-ET test3=VM-ET
+
+./evidencer t+=++ET -dv |grep -e SCRIPT= -e SERVER=
+
+
 Note: Tab Expansion is still a bit wonky here and there. (for example, if you go back to left with the cursor, or if you used parameters)
 
 ## Build in Help
@@ -707,6 +718,8 @@ and pass the variables required through the `EXPORT` variable, like so:
 `EXPORT=BASEDIR,SILENCE,OUTPUTDIR,RUNSERVERFQ,RUNSCRIPTFQ,OUTPUTLOG`
 `RUN=%{RUNSCRIPTSDIR}/run.sh`
 
+This means that `run.sh` can now use `$OUTPUTDIR` directly, without having to pass as a commandline parameter.
+
 You can also use a regexp:  `EXPORT=/RUN/` will export all variables that contain "RUN" in their name.
 
 From the commandline it looks like this:
@@ -716,3 +729,5 @@ From the commandline it looks like this:
 Note that `-e` always ADDs to the existing `EXPORT` defined in the cfg. To replace it use `-r EXPORT=BASEDIR,/RUN/`
 
 TIP: While debugging you can export all variables if you use `-e /./`
+
+TIP: You can use `EXPORT=` or `-e` multiple times.
