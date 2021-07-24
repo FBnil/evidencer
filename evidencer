@@ -10,7 +10,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r141';
+my $VERSION = '0.9r144';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -236,7 +236,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 
 	my %K;
 	my $search = pop @ARGV; # only consider the last argument parameter given
-	$search =~ s/=\K.*//; # remove the server part, if there
+	$search =~ s/=.*//; # remove the server part, if there
 
 	# Deep search for a word inside anny comments in the scripts, and display that method
 	my $better = $search=~s/\+//;
@@ -1620,6 +1620,8 @@ Sometimes expansion does not work, check that there is no other expansion for th
 Tip: the newest file in ./servers/ is aliased to #, so to run a script on all the server in that latest file:
 
 ./evidencer os.show.boottime=#
+
+Tab expansion works for ALIASes starting with / and for suits and for scripts=serverslist. You can use a trailing + to use a substring as the regexp (it also activates ignorecase) and as an AND to find a script or as a wildcard to just match multiple scripts; in the latter case, add a = to end the script part and expand possible serversfiles for the scripts matched. If you do not like the normal working of tab expansion (that trims up to the first dot, thus not showing you full script names), use a single plus as the parameter, then double-tab. 
 
 =head1 LICENSE AND COPYRIGHT
 
