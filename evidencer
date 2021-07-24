@@ -10,7 +10,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r145';
+my $VERSION = '0.9r146';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -76,7 +76,7 @@ our %OPTIONS = (
 	'n|noautofix'   => \$BASECFG{NOAUTOFIX},
 	'u|unfold'      => \$BASECFG{UNFOLD},
 	'f|fold'        => \$BASECFG{FOLD},
-	'F|force'       => \$BASECFG{FORCE},
+	'F|force+'      => \$BASECFG{FORCE},
 	'E|extra=s'     => \$BASECFG{EXTRA},
 	'e|export=s@'   => \$BASECFG{EXPORT},
 	'g|group'       => \$BASECFG{GROUP},
@@ -180,7 +180,7 @@ sub readCFG
 			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/) {
 				$CFG{'ALIAS'}{$1} = $2;
 			}elsif(/^EXPORT\s*=\s*(.*)\s*$/){
-				push @{$CFG{'EXPORT'}}, $1;
+				push @{$CFG{'EXPORT'}}, $1; # comma split later
 			} else {
 				my ( $k, $v ) = split /=/, $_, 2;
 				$v = xexpand( $v, '%\{(\w+)\}', \%CFG ) if index( $v, "%{" ) > -1;
@@ -360,7 +360,7 @@ say FFF "wantservers=$wantservers,realsearch=$realsearch,prev=$prev,n=$n,m=$m:$E
 		@candidates = keys %OPTIONS;
 		if ( $search =~ s/^\-\-// ) {
 			s/^.\|// for @candidates;
-			s/[\:\=\|\!].*$// for @candidates;
+			s/[\:\=\|\!\+].*$// for @candidates;
 			$dashes = 2;
 		} elsif ( $search =~ s/^\-// ) {
 			@_ = ();
@@ -1199,7 +1199,7 @@ sub export{
 		# for: ./evidencer -e RUNSCRIPT,RUNSCRIPTFQ
 		if ( index( $var, "," ) > -1 ) {
 			my $_var = $var;
-			@_ = split /,/, $_var;
+			@_ = split /\s*,\s*/, $_var;
 			$var = shift @_;
 			push @{ $CFG{'EXPORT'} }, @_;
 		}
@@ -1499,7 +1499,7 @@ The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
  -l | --loop <$>    Loop on comma separated list of serverfiles for =#
  -Q | --query <var> Prints the value of a variable defined in your evidencer.cfg and exits
  -V | --version     Prints the real file location and version and exits
- -e | --export <$>  Name of the variables to export to processes using the `RUN*` executes
+ -e | --export <$>  Name of the variables to export to processes using the `RUN*` executes. Comma separated. Sets EXPORT=
  -E | --extra       USR Modifier (string). Use inside your .cfg as: "${EXTRA}"
  -F | --force       USR Modifier (boolean). Use inside your .cfg as: ${FORCE}. Pre set FORCE=0 in cfg
 
@@ -1531,6 +1531,29 @@ RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "%{RUN
 
 $ ./evidencer -s DEMO os.show.mem=# -Q RUN
 RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}" /home/FBnil/evidencer/suits/DEMO/servers/localhost -- /home/FBnil/evidencer/suits/DEMO/scripts/os.show.mem=+ > "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}-2021-07-23_1142.log"
+
+=head1 EXPORT
+
+You can keep your RUN*= configuration clean by, instead of running bash code directly, you isolate it into a script;
+and pass the variables required through the `EXPORT` variable, like so:
+
+EXPORT=BASEDIR,SILENCE,OUTPUTDIR,RUNSERVERFQ,RUNSCRIPTFQ,OUTPUTLOG
+
+RUN=%{RUNSCRIPTSDIR}/run.sh
+
+This means that run.sh can now use $OUTPUTDIR directly, without having to pass as a commandline parameter.
+
+You can also use a regexp:  EXPORT=/RUN/ will export all variables that contain "RUN" in their name.
+
+From the commandline it looks like this:
+
+./evidencer script=serversfile -e /RUN/,BASEDIR
+
+Note that -e always ADDs to the existing EXPORT defined in the cfg. To replace it use -r EXPORT=BASEDIR,/RUN/
+
+TIP: While debugging you can export all variables if you use -e /./
+
+TIP: You can use EXPORT= or -e multiple times. Note that use of -e deletes all EXPORT= defined in the cfg.
 
 
 =head1 REDEFINE
@@ -1569,6 +1592,15 @@ ALIAS /show=&RUN!={,}&RUN_ARG!={,}&RUN_PRE!={,}&RUN_START!={,}&RUN_FINISH!={,}
 
 Note: For this to work, your post action should be configured to display something.
 
+=head1 Unfold
+
+ssh-batch allows for serversfiles that contain serversfiles. For example, you have 2 files: WINDOWS and LINUX, then you create a file ALL with the following content:
+
+./WINDOWS
+
+./LINUX
+
+If you rather have this unfolded in evidencer than by ssh-batch (or rundeer, which does not support it), use -u
 
 =head1 SCRIPTS HELP
 
