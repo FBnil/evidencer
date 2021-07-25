@@ -42,7 +42,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-V` \| `--version` | Prints the real file location and version and exits |
 | `-e` \| `--export` | Name of the variables to export to processes using the `RUN*` |
 | `-E` \| `--extra` | USR Modifier (string). Use inside your .cfg as: `"${EXTRA}"` |
-| `-F` \| `--force` | USR Modifier (boolean). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set |
+| `-F` \| `--force` | USR Modifier (boolean). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set once, 2 when set twice, etc. |
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
