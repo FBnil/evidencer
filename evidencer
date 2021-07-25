@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-open (FFF,'>','log.log');
 use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case no_getopt_compat); # https://perldoc.perl.org/Getopt::Long.txt
@@ -10,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r146';
+my $VERSION = '0.9r150';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -19,7 +18,7 @@ my %RICH;     # for forcing a new servergroup file
 my %CFG;      # Variable configuration
 my %_CFG;     # BASE configuration
 my $MELINKED = -l $0;    # holds if the current file is a symlink (changes behavior)
-my $me;
+my $me; # holds my absolute filename
 {
 	my $lnk = $MELINKED? readlink($0) : '';
 	my $abslnk = $lnk =~m{^/};
@@ -59,7 +58,6 @@ my %BASECFG  = (
 my $SUIT = $ENV{'SUIT'} || "";
 $SUIT = $1 if ( !$SUIT && getcwd() =~ m{/suits/(\w+)} );
 
-my %opt;
 my ( $opt_help, $opt_man, $opt_complete, $opt_version );
 
 our %OPTIONS = (
@@ -117,7 +115,19 @@ if(defined $ENV{'COMP_CWORD'} ){
 	die "$me Version $VERSION\n" if $opt_version || (!@ARGV && $BASECFG{VERBOSE} && $num_args < 1);
 
 	pod2usage( -verbose => 1 ) if defined $opt_help && !@ARGV;
-	pod2usage( -verbose => 2 ) if defined $opt_man;
+	if(defined $opt_man){
+		# pod2use works well on machines that have perl-doc installed. If it's not installed, 
+		# it shows the whole program, not just the manual. If not installed (debian 10 does not,
+		# RHEL 8.x does), the perldoc is a small stub. We detect it, and roll our own documentation.
+		# Or else, it needs to be installed, for example:
+		# apt-get install perl-doc
+		my $exe = "/usr/bin/perldoc";
+		if( -f $exe && -s $exe >125 && !$BASECFG{'FORCE'}){
+			pod2usage( -verbose => 2 )
+		}else{
+			pod3usage( -verbose => 2 );
+		}
+	}
 
 
 	# Make sure at least one argument provided
@@ -150,7 +160,7 @@ sub readCFG
 			'_SELECTED_SUIT' => $NEWSUIT || $CFG{'SUIT'} || '..',
 			'ERRORCODE'      => 0,
 			'RUN_BEGAN'      => 0,
-			'CFGDIR'         => $BASECFG{'CFGDIR'},
+			'CFGDIR'         => $BASECFG{'CFGDIR'} || '.',
 		)
 	);
 
@@ -170,14 +180,14 @@ sub readCFG
 	if ( -f $_CFGFILE ) {
 		$CFG{'CFGFILE'} = $_CFGFILE;
 		say "readCFG($NEWCFG,$NEWSUIT)=$_CFGFILE" if $BASECFG{'VERBOSE'} && !$opt_help && !$opt_complete;
-		open( my $CFG, '<', $_CFGFILE ) or abort("$_CFGFILE $!");
+		open( my $CFH, '<', $_CFGFILE ) or abort("$_CFGFILE $!");
 		my %DIRS = map { $_ => 1 } qw(TEMP);
-		while (<$CFG>) {
+		while (<$CFH>) {
 			next if /^#/ || !/=/;
 			chomp;
 			s/\s+$//;
-			$_.=$_[0] while($_=~s/\\$// && chomp($_[0]=<$CFG>));
-			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/) {
+			$_.=$_[0] while(s/\\\s*$// && chomp($_[0]=<$CFH>));
+			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/s) {
 				$CFG{'ALIAS'}{$1} = $2;
 			}elsif(/^EXPORT\s*=\s*(.*)\s*$/){
 				push @{$CFG{'EXPORT'}}, $1; # comma split later
@@ -189,6 +199,7 @@ sub readCFG
 				$CFG{$k} = $v unless $DONOTOVERRIDE{$k} && defined $CFG{$k};
 			}
 		}
+		close $CFH;
 	}
 	for my $k (qw(SUIT)) {
 		$CFG{$k} = $ENV{$k} if defined $ENV{$k};
@@ -320,7 +331,7 @@ if ($opt_complete)
 			say join " ", @candidates;
 		}},
 	);
-
+ 
 	for my $short_opt (keys %PX){
 		for my $long_opt (keys %{$PX{$short_opt}}){
 			if(($search eq $short_opt || $search eq $long_opt)
@@ -333,7 +344,6 @@ if ($opt_complete)
 
 	my $wantservers = $search =~/=/ || $prev eq '='? 1 : 0;
 	my $realsearch = $search;
-say FFF "wantservers=$wantservers,realsearch=$realsearch,prev=$prev,n=$n,m=$m:$ENV{'COMP_CWORD'}";
 
 	# Process parameters that start with - AND need a parameter
 	if ( $prev =~ m/^\-/ && (!$search || ($m > 0 && $search !~ m/^\-/ ))) {
@@ -388,7 +398,11 @@ say FFF "wantservers=$wantservers,realsearch=$realsearch,prev=$prev,n=$n,m=$m:$E
 
 	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
 
-	my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } getdir(${SUITDIR}.$CFG{'SERVERS'});
+	#my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } getdir(${SUITDIR}.$CFG{'SERVERS'});
+	
+	if(!@methods && $CFG{'WARNINGS'}){
+        warn "You have no executable scripts in ${SUITDIR}$CFG{'SCRIPTS'}. Maybe you forgot chmod +x ?"
+	}
 
 	$search =~ s/[.]/\\./g; # escape dots
 	if ( !$search ) {
@@ -546,7 +560,7 @@ sub getSuitAndScriptsAndHostStr
 	}
 
 	# make a proper scripts (add =* if not there)
-	$scripts .= '=' unless index( $scripts, '=' ) > -1;
+	$scripts .= '=' if index( $scripts, '=' ) == -1;
 	$scripts =~ s/=$/=*/;
 	$scripts =~ s/^=/*=/;
 
@@ -1143,6 +1157,12 @@ sub UnDeepCopy
 
 sub getdir
 {
+    if (! -d $_[0] && $CFG{'WARNINGS'}){
+    warn "\n\nYou need to create a directory structure first. Run the following to do that:\n";
+    $SUIT = $SUIT || '..';
+    warn "$me -Cs $SUIT\n\n";
+    exit 1;
+    }
 	opendir( my $dh, $_[0] ) || die "Can't opendir $_[0] $!";
 	my @list = grep {! /^\./} readdir($dh);
 	closedir $dh;
@@ -1213,6 +1233,45 @@ sub export{
 		}
 	}
 }
+
+# Unfinished attempt at making our own pod.
+sub pod3usage{
+	no warnings;
+		my $exe;
+		$exe="$_" if(($_="/usr/bin/more") && -x $_);
+		$exe="$_ -R" if(($_="/usr/bin/less") && -x $_);
+		#$exe="$_ -l -" if(($_="/usr/bin/man") && -x $_);
+
+		# ./evidencer --man -r NOCOLORS=2
+		if($BASECFG{'REDEFINE'}[0]=~/NOCOLORS/){
+			$BASECFG{$_}="" for grep {/C:/} keys %BASECFG;
+		}
+		open(my $HOUT,"|$exe");
+		my $skip=1;
+		while(<DATA>){
+			chomp;
+			next if $skip && !$_ && $skip--;
+			if( s/=head\d (.*)/$BASECFG{'C:B'}$BASECFG{'C:U'}$1$BASECFG{'C:N'}/){
+				say $HOUT $_;
+				++$skip;
+				next;
+			}else{
+				s/^=(?:item|over \d+|cut|back)// && ++$skip;
+				s/L<(?:.*\|)?([^>]*)>/$BASECFG{'C:Y'}$1$BASECFG{'C:N'}/g;
+				s/^((?:\$ .*|\.\/.*|eval .*))/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/;
+				s/`(.*?)`/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/g;
+				s/^(#.*)/$BASECFG{'C:A'}$1$BASECFG{'C:N'}/;
+				s/B<([^>]*)>/$BASECFG{'C:B'}$1$BASECFG{'C:N'}/g;
+				if(/^\S/){
+					s/^/    /;
+					s/(?:.{70,79}\S|\S{70,}+)\K\s+/\n    /g;
+				};
+				say $HOUT $_;
+			}
+		}
+		close $HOUT;
+		exit;
+}
 __END__
 
 =head1 NAME
@@ -1259,15 +1318,15 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
 
 =head1 DIRECTORIES
 
-./servers/  Define a list of server by function.
+ ./servers/  Define a list of server by function.
 
-./scripts/  Define a list of tests, by function, to be run on those servers
+ ./scripts/  Define a list of tests, by function, to be run on those servers
 
-./results/  Just an empty directory to store results in (from an external program)
+ ./results/  Just an empty directory to store results in (from an external program)
 
-./suits/    Once you are done with your tests, move them away into a suit, still available
+ ./suits/    Once you are done with your tests, move them away into a suit, still available
 
-./tmp/      A temporal directory to hold sub lists of servergroups when using hostnames_regexp
+ ./tmp/      A temporal directory to hold sub lists of servergroups when using hostnames_regexp
 
 Note: You can edit evidencer.cfg beforehand to redefine these directory names. See section CONFIGURATION
 
@@ -1280,16 +1339,20 @@ To create a suits directory structure:
 
 ./evidencer -C -s MYAPPL
 
-If you have SUIT_LINK=1 and/or SUIT_CFG=1 in your configuration file, then evidencer will be symlinked into that directory and/or the evidencer.cfg file will be copied into the new suit.
+If you have B<SUIT_LINK=1> and/or B<SUIT_CFG=1> in your configuration file, then evidencer will be symlinked into that directory and/or the evidencer.cfg file will be copied into the new suit.
 
 
 
-=head1 CONFIGURATION Variables
+=head1 CONFIGURATION
+
+Evidencer needs a configuration file to work.
 
 There are 3 level of configuration files: the toplevel, evidencer.cfg, then inside a suit, also
 named evidencer.cfg, and then per script, the name of the script up to the = and then .cfg
 
-Note: If you rename evidencer to something more to your liking, you need to rename the cfg too.
+Note that the lowest level is always merged with the configuration above; this way you can only configure the differences.
+
+Note: If you rename evidencer to something more to your liking, you need to rename the evidencer.cfg too.
 
 Variables can be used inside other variables. If written as %{VAR} then the substitution is done early,
 if written as ${VAR} then the evaluation is done at runtime.
@@ -1297,6 +1360,10 @@ if written as ${VAR} then the evaluation is done at runtime.
 The variables that can be used are:
 
 =over 10
+    CFGDIR    Configuration directory Defaults to cfg. Can only be defined
+              in the toplevel configuration file (not inside suits). Can
+              place your cfg files in a subdirectory of the SUIT, if you
+
 
 =item B<BASEDIR>
 
@@ -1313,7 +1380,7 @@ The directory where temporal files are created. Temporal files are needed when y
 
 =item B<SUITSDIR>
 
-The directory where are the suit directories are in. The default is a ./suits/ subdirectory where the evidencer script is located.
+The directory where the suit directories are in. The default is a ./suits/ subdirectory where the evidencer script is located.
 
 =item B<SUIT>
 
@@ -1321,19 +1388,19 @@ Defaults to .. this way, you do not need to worry about having a suit directory,
 
 =item B<SERVERS>
 
-If for some reason, you want the ./servers/ directory name to be different, you can override this name. The default is SERVERS=servers
+If for some reason, you want the ./servers/ directory name to be different, you can override this name. The default is B<SERVERS=servers>
 
 =item B<SCRIPTS>
 
-If for some reason, you want the ./scripts/ directory name to be different, you can override this name. For example, to use ssh-batch. That program uses inline as the directory name. The default is SCRIPTS=scripts
+If for some reason, you want the ./scripts/ directory name to be different, you can override this name. For example, to use ssh-batch. That program uses inline as the directory name. The default is B<SCRIPTS=scripts>
 
 =item B<RESULTS>
 
-Just a directory where the results are to be kept. The default is RESULTS=results
+Just a directory where the results are to be kept. The default is B<RESULTS=results>
 
 =item B<ALIAS>
 
-You can define multiple aliases. The suit and the script in the commandline parameters are un-aliased, the hostnames_regexp is not. Example: ALIAS ES=ELASTICSEARCH
+You can define multiple aliases. The suit and the script in the commandline parameters are un-aliased, the hostnames_regexp is not. Example: B<ALIAS> B<ES=ELASTICSEARCH>
 
 Alias can also be used as a parameter, but only from the point you define them in the commandline, unless you use -r, in that case it is processed before anything else.
 
@@ -1662,5 +1729,16 @@ Tab expansion works for ALIASes starting with / and for suits and for scripts=se
 This software is released under the Unlicense statement.
 It is free and unencumbered software released into the public domain.
 If you don't know what that means visit L<https://unlicense.org/>.
+
+=head1 DEPENDENCIES
+
+Evidencer is only an orchestrator. It needs a commandline remote execution tool. You can use ssh-batch (recommended) or Rundeer to actually perform the remote connections.
+
+=head1 USAGE
+
+./evidencer [options] [script]=[serversfile]
+
+You need: scripts, serversfiles and a configured ssh-batch. See:
+./evidencer --man -r NOCOLORS=1
 
 =cut
