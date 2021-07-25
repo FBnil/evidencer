@@ -5,6 +5,7 @@ use Data::Dumper;
 
 my $exe = "./evidencer";
 ok( -f $exe , 'Evidencer binary found' );
+ok( -x $exe , 'Evidencer binary is executable' );
 
 system '/usr/bin/perl','-w','-c',$exe;
 ok( $? == 0 , 'Perl Compiles the binary' );
@@ -18,7 +19,7 @@ print "d=".(-d $TDIR);
 system "rm -rf $TDIR" if(-d $TDIR);
 
 system $exe,'-C','-s','BUILDTEST';
-ok( $? == 0 , 'BUILDTEST directory structure' );
+ok( $? == 0 , 'BUILDTEST directory structure (re)created' );
 
 my $cfgF = "$TDIR/evidencer.cfg";
 createfile($cfgF,
@@ -98,7 +99,7 @@ subtest 'Folding1' => sub {
   say @_;
   is($#_,2-1,'two lines folded');
   like($_[0], qr/TEST1=\+\+ET  TEST2=\+\+ET on VM-ET/, 'folded');
-  like($_[1], qr!/home/nilton/CODE/PERL/EVIDENCER/suits/BUILDTEST/scripts/TEST1=\+\+ET  /home/nilton/CODE/PERL/EVIDENCER/suits/BUILDTEST/scripts/TEST2=\+\+ET on /home/nilton/CODE/PERL/EVIDENCER/suits/BUILDTEST/servers/VM-ET"!i, 'folded run');
+  like($_[1], qr!/.*/suits/BUILDTEST/scripts/TEST1=\+\+ET  /.*/suits/BUILDTEST/scripts/TEST2=\+\+ET on /.*/suits/BUILDTEST/servers/VM-ET"!i, 'folded run');
   
 };
 
@@ -110,7 +111,7 @@ subtest 'bundling parameters' => sub {
   say @_;
   is($#_,2-1,'two lines bundled');
   like($_[0], qr/TEST1=\+\+ET  TEST2=\+\+ET on VM-ET/, 'bundling');
-  like($_[1], qr!/home/nilton/CODE/PERL/EVIDENCER/suits/BUILDTEST/scripts/TEST1=\+\+ET  /home/nilton/CODE/PERL/EVIDENCER/suits/BUILDTEST/scripts/TEST2=\+\+ET on /home/nilton/CODE/PERL/EVIDENCER/suits/BUILDTEST/servers/VM-ET"!i, 'bundling run');
+  like($_[1], qr!/.*/suits/BUILDTEST/scripts/TEST1=\+\+ET  /.*/suits/BUILDTEST/scripts/TEST2=\+\+ET on /.*/suits/BUILDTEST/servers/VM-ET"!i, 'bundling run');
   
 };
 
