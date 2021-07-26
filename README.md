@@ -84,9 +84,9 @@ By itself, the `#` means the newest ./servers/ file. But combined with a `--on`,
 
 ## LOOP
 
-The behavior is similar to `--on`, but the given parameters are serversfiles inside ./servers/
+The behavior of `--loop` is similar to `--on`, but the given parameters are serversfiles inside ./servers/
 
-`./evidencer test=\# -l serverlist1,serverlist2 -o serverlist3`
+`./evidencer test=\# -l serverlist1,serverlist2 -l serverlist3`
 
 
 ## Directories
@@ -692,7 +692,7 @@ Note that <0> is not a color but the name of the script for which the help is be
 
 
 
-Note: `ssh-batch` skips all comments, so you are not increasing IO by adding good documentation.
+Note: `ssh-batch` skips all comments before transmitting your code, so you are not increasing IO by adding good documentation.
 
 
 ## Focus on one suit
@@ -716,6 +716,7 @@ You can keep your configuration clean by instead of running bash code directly, 
 and pass the variables required through the `EXPORT` variable, like so:
 
 `EXPORT=BASEDIR,SILENCE,OUTPUTDIR,RUNSERVERFQ,RUNSCRIPTFQ,OUTPUTLOG`
+
 `RUN=%{RUNSCRIPTSDIR}/run.sh`
 
 This means that `run.sh` can now use `$OUTPUTDIR` directly, without having to pass as a commandline parameter.
