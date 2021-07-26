@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r150';
+my $VERSION = '0.9r151';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -1360,10 +1360,6 @@ if written as ${VAR} then the evaluation is done at runtime.
 The variables that can be used are:
 
 =over 10
-    CFGDIR    Configuration directory Defaults to cfg. Can only be defined
-              in the toplevel configuration file (not inside suits). Can
-              place your cfg files in a subdirectory of the SUIT, if you
-
 
 =item B<BASEDIR>
 
@@ -1738,7 +1734,10 @@ Evidencer is only an orchestrator. It needs a commandline remote execution tool.
 
 ./evidencer [options] [script]=[serversfile]
 
-You need: scripts, serversfiles and a configured ssh-batch. See:
-./evidencer --man -r NOCOLORS=1
+You need: scripts, serversfiles and a configured ssh-batch.
+
+Short help: ./evidencer -h
+
+Long help:  ./evidencer --man [-F]
 
 =cut
