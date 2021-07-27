@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r154';
+my $VERSION = '0.9r155';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -215,6 +215,8 @@ readCFG( $CFGFILE ); # Read toplevel evidencer.cfg only for CFGDIR
 $BASECFG{'CFGDIR'} = $CFG{'CFGDIR'} if $CFG{'CFGDIR'} ne $BASECFG{'CFGDIR'};
 readCFG( $CFGFILE, $SUIT ) if $SUIT;
 
+
+
 # Get variables defined in the .cfg file, and print them out.
 sub doQuery{
 	my @want;
@@ -230,8 +232,10 @@ sub doQuery{
 			++$found_alias{$w} if defined $CFG{'ALIAS'}{$w};
 		}
 	}
-	say $_.'='.($CFG{$_}? xexpand($CFG{$_}, '%\{(\w+)\}', \%CFG ):"") for sort keys %found; # bug: /\033/\\033/g
-	say $_.'='.($CFG{'ALIAS'}{$_}? xexpand($CFG{'ALIAS'}{$_}, '%\{(\w+)\}', \%CFG ):"") for sort keys %found_alias;
+
+	say $_.'='.(defined $CFG{$_}? xexpandAll($CFG{$_}) : "") for sort keys %found; # bug: /\033/\\033/g 
+	say $_.'='.(defined $CFG{'ALIAS'}{$_}? xexpandAll($CFG{'ALIAS'}{$_}) : "") for sort keys %found_alias;
+
 	&cleanup();
 	exit;
 }
@@ -1055,14 +1059,7 @@ sub runit
 	my ( $KEY, $no_time_update, $not_started_yet ) = @_;
 	if ( $_ = $CFG{$KEY} ) {
 		updateTime( \%CFG ) unless $no_time_update;
-		if(index( $_, "%{" ) > -1){
-			xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) ;
-			xexpand( $_, '%\{([\w:]+)\}', \%CFG );
-		}
-		if(index( $_, "\${" ) > -1 && !$CFG{'DRYRUN'}){
-			xexpand( $_, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' ) ;
-			xexpand( $_, '\$\{(\w+)\}', \%CFG, '$' )
-		}
+		$_ = xexpandAll($_, $CFG{'DRYRUN'});
 
 		if ( $CFG{'DRYRUN'} ) {
 			say "# RUN_BEGIN:\n" . $CFG{'RUN_BEGIN'}
@@ -1114,6 +1111,21 @@ sub xexpand
 		}
 	}
 	$_[0];
+}
+
+# Expand everything for a string
+sub xexpandAll
+{
+	my($v,$isdryrun) = @_;
+	if(index( $v, "%{" ) > -1){
+		xexpand( $v, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) ;
+		xexpand( $v, '%\{([\w:]+)\}', \%CFG );
+	}
+	if(index( $v, "\${" ) > -1 && !$isdryrun){
+		xexpand( $v, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' ) ;
+		xexpand( $v, '\$\{(\w+)\}', \%CFG, '$' )
+	}
+	$v;
 }
 
 # Time variables exposed to CFGFILE

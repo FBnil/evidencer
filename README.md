@@ -74,7 +74,7 @@ RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "%{RUN
 
 `./evidencer -s DEMO os.show.mem=# -Q RUN`
 
-RUN=/home/FBnil/evidencer/bin/ssh-batch ${SILENCE} --no-info --bg-log-dir "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}" /home/FBnil/evidencer/suits/DEMO/servers/localhost -- /home/FBnil/evidencer/suits/DEMO/scripts/os.show.mem=+ > "/home/FBnil/evidencer/suits/DEMO/results/${RUNNAMES}-2021-07-23_1142.log"
+RUN=/home/FBnil/evidencer/bin/ssh-batch  --no-info --bg-log-dir "/home/FBnil/evidencer/suits/DEMO/results/os.show.mem" /home/FBnil/evidencer/suits/DEMO/servers/localhost -- /home/FBnil/evidencer/suits/DEMO/scripts/os.show.mem=+ > "/home/FBnil/evidencer/suits/DEMO/results/os.show.mem-2021-07-28_0055.log"
 
 
 ## ON
@@ -342,6 +342,7 @@ All variables that have to do with running found combinations of servers and scr
 |ARGV|The script+server combination we are running|
 |ARG|Contains the string with the argument(s) passed with `--` or a single argument passed with `-a`|
 |N|A number that increases just before you use the: `RUN_PRE`, `RUN` and `RUN_POST`. Use it like: `%{N}`|
+|SERVER|Only available to `RUN_FILTER` it contains a full line of a serversfile|
 |RUNSCRIPTSDIR|The directory where the scripts are located, basically: `%{SUITSDIR}`/`%{SUIT}`/`%{SCRIPTS}`|
 |RUNSERVERSDIR|The directory where the servergroups are located, basically: `%{SUITSDIR}`/`%{SUIT}`/`%{SERVERS}`|
 |RUNSUIT|The currently running suit|
@@ -711,6 +712,8 @@ Tip: the newest file in `./servers/` is aliased to `#`, so to run a script on al
 
 `./evidencer os.show.boottime=#`
 
+Tip: If you set: `SUIT_LINK=1` in your main configuration file, the symlink to evidencer is made automatically at `-Cs` time.
+
 ## EXPORT
 
 You can keep your configuration clean by instead of running bash code directly, you isolate it into a script;
@@ -722,7 +725,7 @@ and pass the variables required through the `EXPORT` variable, like so:
 
 This means that `run.sh` can now use `$OUTPUTDIR` directly, without having to pass as a commandline parameter.
 
-You can also use a regexp:  `EXPORT=/RUN/` will export all variables that contain "RUN" in their name.
+You can also use a regexp, for example:  `EXPORT=/RUN/` will export all variables that contain "RUN" in their name.
 
 From the commandline it looks like this:
 
@@ -733,3 +736,20 @@ Note that `-e` always ADDs to the existing `EXPORT` defined in the cfg. To repla
 TIP: While debugging you can export all variables if you use `-e /./`
 
 TIP: You can use `EXPORT=` or `-e` multiple times.
+
+## XFILTER
+
+The exclusion filter `-x` (`--xfilter`) is a modifier you can use to activate `RUN_FILTER`, which will iterate over each serversfile where a script would run, and then execute `RUN_FILTER` for each serverline in that serversfile. It has the new variable `%{SERVER}` at it's disposal. The exitcode of `RUN_FILTER` is important: An exitcode of zero means you allow the script to run on the server, and a nonzero result means the server evaluated will not run that script. Note that `%{SERVER}` contains a complete serversfile line, including comments, users and jumphosts. If the serversfile is nested, do not forget to use `-u` to unfold it first. You can use `@<hostnames_regexp>` together with `-x`.
+
+Uses: When you have run a script remotely, but some resultfiles are corrupt, or empty, remove these, and run with `-x`. There is an example for the NOT filter (called `PRE^filter`) in the `justinstallademo.sh` and `evidencer.cfg`. The NOT filter will say true (run script on server) if a report file does not exist for a server, and false (do not run) if it exists already. But you may have other filters uses: discard by file age, by content, etc.
+
+Example configuration:
+```
+# Define names for filter processes
+FILTER_PROCESS_SCRIPT=%{RUNSCRIPTSDIR}/%{RUNNAME}^filter
+FILTER_PROCESS=%{RUNSCRIPTSDIR}/PRE^filter
+
+RUN_FILTER=if [ -x %{FILTER_PROCESS_SCRIPT} ];then %{FILTER_PROCESS_SCRIPT} "%{OUTPUTDIR}" "${SERVER}" ; else %{FILTER_PROCESS} "%{OUTPUTDIR}" "${SERVER}";fi
+```
+
+In order to switch filters, use `-xr RUN_FILTER=`  You can not have multiple filters, 
