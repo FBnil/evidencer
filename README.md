@@ -40,6 +40,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#` |
 | `-Q` \| `--query` `<var>` |Prints the value of a variable defined in your evidencer.cfg and exits |
 | `-V` \| `--version` | Prints the real file location and version and exits |
+| `-x` \| `--xfilter` |  eXcludeFilter: Filter the servers through RUN_FILTER= to determine if it needs to added in the run, before RUN_PRE. |
 | `-e` \| `--export` | Name of the variables to export to processes using the `RUN*` |
 | `-E` \| `--extra` | USR Modifier (string). Use inside your .cfg as: `"${EXTRA}"` |
 | `-F` \| `--force` | USR Modifier (boolean). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set once, 2 when set twice, etc. |

@@ -240,6 +240,41 @@ done
 
 EOF
 
+
+
+echo "Extracting ./scripts/PRE^filter"
+cat << 'EOF' > ./scripts/PRE^filter
+OUTPUTDIR=$1
+shift
+SERVER="$@"
+
+# This is a NOT filter.
+# Return false (nonzero) if the results file already exists, and true (zero) if not
+# This way, you can go to your ./results/script/ directory where there are output files, one for each server
+# And delete the ones that are old/corrupt; then rerun evidencer to only pick up the servers that have no result yet.
+# To use it, you need to:
+# 1: use -x in the commandline
+# 2: Have the filter defined in the configuration file, for example:
+#
+# FILTER_PROCESS_SCRIPT=%{RUNSCRIPTSDIR}/%{RUNNAME}^filter
+# FILTER_PROCESS=%{RUNSCRIPTSDIR}/PRE^filter
+# RUN_FILTER=if [ -x %{FILTER_PROCESS_SCRIPT} ];then %{FILTER_PROCESS_SCRIPT} "${SERVER}" ; else %{FILTER_PROCESS} "%{OUTPUTDIR}" "${SERVER}";fi
+#
+# 3: Have a RUN that uses ssh-batch with the --bg-log-dir parameter, to write the output for each machine into it's own file.
+#
+# Note: You can additionally use -r redefine to change the filter. (file too old, failed verification, etc). Make sure that if you have a 
+# serversfile with rich content (not only the servername, but also the user/jumphost/comment) to clean the input first.
+
+RESULTSFILE="$OUTPUTDIR/$SERVER"
+
+if [ -f $RESULTSFILE ];then
+	exit 1
+else
+	exit 0
+fi
+EOF
+
+
 chmod +x scripts/*
 
 cd -

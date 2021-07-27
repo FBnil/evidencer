@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r151';
+my $VERSION = '0.9r154';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -90,6 +90,7 @@ our %OPTIONS = (
 	'l|loop=s@'     => \$BASECFG{LOOP},
 	'o|on=s@'       => \$BASECFG{ON},
 	'V|version'     => \$opt_version,
+	'x|xfilter'     => \$BASECFG{XFILTER},
 );
 
 
@@ -135,6 +136,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 		pod2usage( -verbose => 0, -message => "$0: one argument required" );
 	}
 }
+
 
 # Do not override these from configuration file if set from the commandline through params
 my %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
@@ -797,9 +799,11 @@ for my $argv (@ARGV) {
 				push @{ $SCRIPT_FILES{$suitscript}{'!'} }, '.' if $RICH{ $CFG{'RUNSERVERFQ'} };
 			}
 
+			push @{ $SCRIPT_FILES{$suitscript}{'!'} }, '.' if ($CFG{'XFILTER'} && ! defined $SCRIPT_FILES{$suitscript}{'!'});
+
 			if ( defined $SCRIPT_FILES{$suitscript}{'!'} ) {
 				say "###$script:opening $CFG{RUNSERVERFQ} for $CFG{RUNSCRIPTFQ}" if $CFG{'DEBUG'};
-				my @read_servers = readfiletoarray( $CFG{'RUNSERVERFQ'}, 0 );
+				my @read_servers = readfiletoarray( $CFG{'RUNSERVERFQ'}, $RICH{ $CFG{'RUNSERVERFQ'} }?1:0 );
 				my @servers;
 				my $counter = 0;
 				my %SEEN;
@@ -821,10 +825,26 @@ for my $argv (@ARGV) {
 					}
 				}
 
-				say "Filter(\@) matched "
+				if ($CFG{'XFILTER'}){
+					abort("Undefined RUN_FILTER in the configuration file") unless defined $CFG{'RUN_FILTER'};
+					@read_servers = @servers;
+					@servers=();
+					$CFG{'RUNNAMES'} = $CFG{'RUNNAME'};
+					for my $svr (@read_servers){
+						$CFG{'SERVER'} = $svr;
+						doQuery if defined $BASECFG{'QUERY'};
+						my $result = runit('RUN_FILTER',1,1);
+						say "### RUN_FILTER: $script:filtering '$svr':(" . ($result?'no':'yes') . ")" if $CFG{'DEBUG'};
+						if($result == 0){
+							push @servers, $svr;
+						}
+					}
+				}
+
+				{no warnings; "Filter(\@) matched "
 				  . ( $#servers + 1 )
 				  . " out of $counter from $CFG{RUNSERVERFQ} UNFOLDED=$CFG{'UNFOLDED'} RICH=$CFG{'RICH'} UNFOLD=$CFG{'UNFOLD'} ~> $RICH{$CFG{RUNSERVERFQ}}"
-				  if $CFG{'DEBUG'};
+				  if $CFG{'DEBUG'}; };
 				next unless @servers;    # no matches, skip this test
 				     # only create a temporal file if we do not match ALL servers in this group.
 				if ( $#servers + 1 < $counter || $RICH{ $CFG{'RUNSERVERFQ'} } ) {
@@ -1032,12 +1052,12 @@ sub abort
 # Run (or dryrun) the commands defined as RUN... in the cfg file
 sub runit
 {
-	my ( $KEY, $no_time_update ) = @_;
+	my ( $KEY, $no_time_update, $not_started_yet ) = @_;
 	if ( $_ = $CFG{$KEY} ) {
 		updateTime( \%CFG ) unless $no_time_update;
 		if(index( $_, "%{" ) > -1){
 			xexpand( $_, '%\{(\w+)\}', \%{ $CFG{'ALIAS'} } ) ;
-			xexpand( $_, '%\{([\w:]+)\}', \%CFG )
+			xexpand( $_, '%\{([\w:]+)\}', \%CFG );
 		}
 		if(index( $_, "\${" ) > -1 && !$CFG{'DRYRUN'}){
 			xexpand( $_, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' ) ;
@@ -1049,7 +1069,7 @@ sub runit
 			  if ( defined $CFG{'RUN_BEGIN'} && !$BASECFG{'RUN_BEGAN'}++ );
 			say "# $KEY:\n" . $_;
 		} else {
-			if ( $KEY ne 'RUN_START' && defined $CFG{'RUN_BEGIN'} && !$BASECFG{'RUN_BEGAN'}++ ) {
+			if ( !$not_started_yet && $KEY ne 'RUN_START' && defined $CFG{'RUN_BEGIN'} && !$BASECFG{'RUN_BEGAN'}++ ) {
 				my $__ = $_;
 				$CFG{'_'}=$CFG{'RUN_BEGIN'};
 				$CFG{'__FAIL'}=$CFG{'RUN_BEGIN_FAIL'} if defined $CFG{'RUN_BEGIN_FAIL'};
@@ -1060,8 +1080,10 @@ sub runit
 			say $_ if $CFG{'VERBOSE'};
 			my $ec = system $_;
 			say " # ExitCode=$?" if $CFG{'VERBOSE'};
-			$CFG{'TOTALERRORS'} = $BASECFG{'TOTALERRORS'} += 1 if $CFG{'ERRORCODE'} = $ec >> 8;
-			runit( $KEY . "_FAIL", 1 ) if ( $ec && $KEY !~ /_FAIL$/ && $CFG{ $KEY . "_FAIL" } );
+			if ( !$not_started_yet ){
+				$CFG{'TOTALERRORS'} = $BASECFG{'TOTALERRORS'} += 1 if $CFG{'ERRORCODE'} = $ec >> 8;
+				runit( $KEY . "_FAIL", 1 ) if ( $ec && $KEY !~ /_FAIL$/ && $CFG{ $KEY . "_FAIL" } );
+			}
 			return $ec;
 		}
 	}
@@ -1081,10 +1103,15 @@ sub globlize
 # xexpands %{} or ${} variables
 sub xexpand
 {
-	if($_[3]){
-		$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"\${$1}"/ge;
-	}else{
-		$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"%{$1}"/ge;
+	my $m="";
+	my $max=5;
+	while(--$max && $_[0] ne $m){
+		$m = $_[0];
+		if($_[3]){
+			$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"\${$1}"/ge;
+		}else{
+			$_[0] =~ s/$_[1]/defined($_[2]{$1})?$_[2]{$1}:"%{$1}"/ge;
+		}
 	}
 	$_[0];
 }
@@ -1114,7 +1141,7 @@ sub updateTime
 sub readfiletoarray
 {
 	my ( $_file, $_recursed, $_filter ) = @_;
-	say "readfiletoarray($_file,$_recursed,$_filter)" if $CFG{'DEBUG'};
+	{no warnings; say "readfiletoarray($_file,$_recursed,$_filter)" if $CFG{'DEBUG'}; };
 	$CFG{'UNFOLDED'} = $CFG{'RICH'} = 0 unless $_recursed;
 	open( my $FIN, '<', $_file ) or abort("$_file: $!");
 	my @_SVRS;
@@ -1562,6 +1589,7 @@ The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
  -l | --loop <$>    Loop on comma separated list of serverfiles for =#
  -Q | --query <var> Prints the value of a variable defined in your evidencer.cfg and exits
  -V | --version     Prints the real file location and version and exits
+ -x | --xfilter     eXcludeFilter: Filter the servers through RUN_FILTER= to determine if it needs to added in the run, before RUN_PRE.
  -e | --export <$>  Name of the variables to export to processes using the `RUN*` executes. Comma separated. Sets EXPORT=
  -E | --extra       USR Modifier (string). Use inside your .cfg as: "${EXTRA}"
  -F | --force       USR Modifier (boolean). Use inside your .cfg as: ${FORCE}. Pre set FORCE=0 in cfg
