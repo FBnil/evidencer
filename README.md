@@ -43,7 +43,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-x` \| `--xfilter` |  eXcludeFilter: Filter the servers through RUN_FILTER= to determine if it needs to added in the run, before RUN_PRE. |
 | `-e` \| `--export` | Name of the variables to export to processes using the `RUN*` |
 | `-E` \| `--extra` | USR Modifier (string). Use inside your .cfg as: `"${EXTRA}"` |
-| `-F` \| `--force` | USR Modifier (boolean). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set once, 2 when set twice, etc. |
+| `-F` \| `--force` | USR Modifier (number). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set once, `2` when set twice, etc. |
 
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
 
@@ -750,6 +750,20 @@ FILTER_PROCESS_SCRIPT=%{RUNSCRIPTSDIR}/%{RUNNAME}^filter
 FILTER_PROCESS=%{RUNSCRIPTSDIR}/PRE^filter
 
 RUN_FILTER=if [ -x %{FILTER_PROCESS_SCRIPT} ];then %{FILTER_PROCESS_SCRIPT} "%{OUTPUTDIR}" "${SERVER}" ; else %{FILTER_PROCESS} "%{OUTPUTDIR}" "${SERVER}";fi
+
+# Skip if the fileage is newer than ${MAXAGE} (in days). Do not skip if old, nor if file does not exist.
+MAXAGE=1
+MAXAGESECS=$((${MAXAGE}*24*60*60))
+FILTER_AGE= NOW=$(date +%s); AGE=$(stat -c %Y "%{OUTPUTDIR}/%{SERVER}"); DIFF=$(($AGE - $NOW + ${MAXAGESECS})); [ $DIFF -lt 0 ]
+# Skip if the file exists
+FILTER_EXISTS= [ ! -f "%{OUTPUTDIR}/%{SERVER}" ]
+ALIAS /skipifnew=&RUN_FILTER!=%{FILTER_AGE}{,}XFILTER!=1
+ALIAS /skipifexists=&RUN_FILTER!=%{FILTER_EXISTS}{,}XFILTER!=1
+
+
 ```
 
-In order to switch filters, use `-xr RUN_FILTER=`  You can not have multiple filters, 
+In order to switch filters, use `-xr RUN_FILTER=%{AGEFILTER} -r MAXAGE=1`  You can not have multiple filters, but you can make your commandline have `||` and simulate one.
+And you can even use an alias to shorten a filter.
+`./evidencer /skipifexists test=serverslist`
+`./evidencer test=serverslist -r /skipifnew`
