@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r155';
+my $VERSION = '0.9r158';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -645,7 +645,7 @@ sub getscripts
 			push( @REG_SERVERS, map basename($_->[0]),
 			sort { $b->[1] <=> $a->[1] } map [ $_, +(stat $_)[9] ],
 			grep $_ ne '.' && $_ ne '..', glob( $serversdir . '/' . '*' ) );
-			$scripts = $REG_SERVERS[0] || "";
+			@REG_SERVERS = ($scripts = $REG_SERVERS[0] || "");
 		}else{
 			push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
 		}
@@ -837,8 +837,11 @@ for my $argv (@ARGV) {
 					for my $svr (@read_servers){
 						$CFG{'SERVER'} = $svr;
 						doQuery if defined $BASECFG{'QUERY'};
+						my $DRYRUN_org = $CFG{'DRYRUN'};
+						$CFG{'DRYRUN'} = 0; # let the filter always run
 						my $result = runit('RUN_FILTER',1,1);
-						say "### RUN_FILTER: $script:filtering '$svr':(" . ($result?'no':'yes') . ")" if $CFG{'DEBUG'};
+						$CFG{'DRYRUN'} = $DRYRUN_org;
+						say "### RUN_FILTER: $script:filter-in '$svr':(" . ($result?'no':'yes') . ")" if $CFG{'DEBUG'};
 						if($result == 0){
 							push @servers, $svr;
 						}

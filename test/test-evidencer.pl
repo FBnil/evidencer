@@ -36,7 +36,7 @@ ok( $? == 0 , 'BUILDTEST directory structure' );
 
 my %S = (
   'servers' => {
-    'VM-ET' => [ qw(svr1et svr2et) ],
+    'VM-ET' => [ qw(svr1et svr1pr) ],
     'VM-PR' =>[ qw(svr1pr svr2pr) ],
     'VM-PR-DMZ' =>[ qw(svr1dmz svr2dmz) ],
   },
@@ -57,6 +57,7 @@ for my $d (keys %S){
     createfile($FN, @{$S{$d}{$f}} );
   }
 }
+createfile("$TDIR/servers/PR",qw(svr3pr svr4pr));
 
 @_ = `$exe $cfg TEST1= -d -v |grep -v '# RUN:'|grep RUN`;
 say @_;
@@ -144,23 +145,23 @@ subtest 'argument1' => sub {
 
 @_ = `$exe $cfg =# -dv |grep -v '# RUN:'|grep RUN`;
 say @_;
-is($#_,2-1,'hash is latest');
-like($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-ET/, 'TEST1 on ET');
-like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-ET/, 'TEST2 on ET');
+is($#_,2-1,'hash is latest (PR)');
+like($_[0], qr/BUILDTEST:TEST1=\+\+ET on PR/, 'TEST1 on PR hash');
+like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on PR/, 'TEST2 on PR hash');
 
 @_ = `$exe $cfg =# -dv -l VM-PR |grep -v '# RUN:'|grep RUN`;
 say @_;
 is($#_,2-1,'Test --loop 1');
 unlike($_[0], qr/DMZ/, 'TEST1 on PR through --loop 1 - no DMZ match');
 unlike($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-PR/, 'TEST1 on PR through --loop 1');
-like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR through --loop 1');
+like($_[1],   qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR through --loop 1');
 
 @_ = `$exe $cfg =# -v -l VM-PR |grep -v '# RUN:'|grep RUN`;
 say @_;
 is($#_,2-1,'Test --loop 2');
 unlike($_[0], qr/DMZ/, 'TEST1 on PR through --loop 2 - no DMZ match');
 unlike($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-PR/, 'TEST1 on PR through --loop 2 - no ET match');
-like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR through --loop 2');
+like($_[1],   qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR through --loop 2');
 
 subtest 'LOOPs are same as not using loops' => sub {
   plan tests => 6;
