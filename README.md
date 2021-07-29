@@ -159,7 +159,7 @@ The `@hostnames` regexp's are not un-ALIAS-ed. Don't forget to escape or quote.
 ```sh
 ./evidencer test2=HTTPD-ACCP@#1,#2
 ```
-Run the `test2` only the first and second server from the `HTTPD-ACCP` list
+Run the `test2` only the first and second server from the `HTTPD-ACCP` list. You can also select ranges:  `test2=HTTPD-ACCP@#3-` to run from the third in the list onwards, or from `test2=HTTPD-ACCP@#3-5` the third to the fifth, or `test2=HTTPD-ACCP@#1--2` from the first to the second last (skips last server in the list).
 ```sh
 ./evidencer test3
 ```
@@ -754,6 +754,7 @@ RUN_FILTER=if [ -x %{FILTER_PROCESS_SCRIPT} ];then %{FILTER_PROCESS_SCRIPT} "%{O
 # Skip if the fileage is newer than ${MAXAGE} (in days). Do not skip if old, nor if file does not exist.
 MAXAGE=1
 MAXAGESECS=$((${MAXAGE}*24*60*60))
+# https://unix.stackexchange.com/questions/102691/get-age-of-given-file
 FILTER_AGE= NOW=$(date +%s); AGE=$(stat -c %Y "%{OUTPUTDIR}/%{SERVER}"); DIFF=$(($AGE - $NOW + ${MAXAGESECS})); [ $DIFF -lt 0 ]
 # Skip if the file exists
 FILTER_EXISTS= [ ! -f "%{OUTPUTDIR}/%{SERVER}" ]

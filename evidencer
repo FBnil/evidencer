@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r158';
+my $VERSION = '0.9r159';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -548,7 +548,7 @@ if ( defined $BASECFG{'ON'} ) {
 
 runit('RUN_START') unless defined $BASECFG{'QUERY'};
 
-# Split argument string into suit, scripts and hoststr (suit:scripts=+:hoststr)
+# Split argument string into suit, scripts and hoststr (suit:scripts=+@hoststr)
 sub getSuitAndScriptsAndHostStr
 {
 	my ($argv) = @_;
@@ -811,21 +811,24 @@ for my $argv (@ARGV) {
 				my @servers;
 				my $counter = 0;
 				my %SEEN;
+				my $max = $#read_servers + 1;
 				while ( ($_ = shift @read_servers) && !$SEEN{$_}++) {
 					chomp;
 					my $found = 0;
 					++$counter;
 					for my $regexp ( @{ $SCRIPT_FILES{$suitscript}{'!'} } ) {
-						say "looking if $_ matches $regexp" if $CFG{'DEBUG'};
+						print "looking if $_ matches $regexp " if $CFG{'DEBUG'};
 						if (
-							$regexp =~ /^#(\-?\d+)/
-							? ( $1 > 0 ? $counter == $1 : $#read_servers + 2 == -$1 )
+							$regexp =~ /^#(\-?\d+)(\-)?(\-?\d+)?/
+							? checkrange($1,$2,$3,$counter, $max)
 							: m/$regexp/ix
 						) {
 							s/\s+.*//;
 							push @servers, $_;
+							say "yes" if $CFG{'DEBUG'};
 							last;
 						}
+						say "no" if $CFG{'DEBUG'};
 					}
 				}
 
@@ -1276,6 +1279,24 @@ sub export{
 	}
 }
 
+sub checkrange
+{
+	my(($start,$range,$end,$counter,$max)) = @_;
+	if(defined $range){
+		if (defined $end){
+			abort("Invalid range given:#\@ $start - $end . $end should be a negative index too") if($start<0 && $end>0);
+			$start = $max+1 + $start if $start < 0;
+			$end = $max+1 + $end if $end < 0;
+			abort("Invalid range given:#\@ $start - $end . $end should bigger than $start") if($start>$end);
+			return $start <= $counter && $counter <= $end;
+		}else{
+			return $start > 0 ? $counter >= $start : $max +1 -$start >= $counter;
+		}
+	}else{
+		return $start > 0 ? $counter == $start : $max +1 -$start == $counter;
+	}
+}
+
 # Unfinished attempt at making our own pod.
 sub pod3usage{
 	no warnings;
@@ -1324,14 +1345,16 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
 
 =head1 DESCRIPTION
 
- evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...|#n>] [--help] [--man]
- 
+ evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...|#n|#n-m>] [--help]
  
  Example:
 
  # Run, from the suit JAVATRANSACTIONS the test JAVASERVER-SERVICES= for servers JAVA-ET
  # that match the perl regexp javaserver00[1..5] or the substring javaserver0100
  ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
+ 
+ # Run from the 5th on the JAVA-ET@ list to the second last. (use 5--1 or 5- for 5th to last)
+ ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@#5--2
 
  # show (dryrun) what would run from the suit JAVATRANSACTIONS the test
  # JAVASERVER-SERVICES= for any matching servers AND the test JAVASERVER-PORTS for any of it's
@@ -1775,7 +1798,7 @@ Evidencer is only an orchestrator. It needs a commandline remote execution tool.
 
 =head1 USAGE
 
-./evidencer [options] [script]=[serversfile]
+./evidencer [options] [script]=[serversfile]@substr
 
 You need: scripts, serversfiles and a configured ssh-batch.
 
