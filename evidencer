@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r159';
+my $VERSION = '0.9r160';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -24,7 +24,7 @@ my $me; # holds my absolute filename
 	my $abslnk = $lnk =~m{^/};
 	$me = dirname( abs_path( $MELINKED ? ($abslnk? '' : dirname($0).'/').$lnk : $0 ) ) . '/' . basename($0);
 }
-my %BASECFG  = (
+our %BASECFG  = (
 	PID       => $$,
 	N         => 0,
 	UTC       => 0,
@@ -93,6 +93,14 @@ our %OPTIONS = (
 	'x|xfilter'     => \$BASECFG{XFILTER},
 );
 
+# Do not override these from configuration file if set from the commandline through params
+our %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
+
+# Try to read ./.evidencer if it exists and execute it. (use it to add parameter functions)
+my $dotme = $me;
+$dotme =~s{^.*/\K}{.};
+do $dotme if -f $dotme;
+
 
 if(defined $ENV{'COMP_CWORD'} ){
 	# Now we do need a change in behavior if a suit is loaded, because we have other tests
@@ -136,11 +144,6 @@ if(defined $ENV{'COMP_CWORD'} ){
 		pod2usage( -verbose => 0, -message => "$0: one argument required" );
 	}
 }
-
-
-# Do not override these from configuration file if set from the commandline through params
-my %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
-
 
 # Read configuration file
 sub readCFG

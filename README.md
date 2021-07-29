@@ -30,22 +30,41 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-g` \| `--group` |Group by Servergroups|
 | `-b` \| `--bundle` |Concatenate all scripts/servers if they are folded or grouped|
 | `-r` \| `--redefine` `<var=val>`|Override a variable from evidencer.cfg (can be used multiple times)|
-| `-a` \| `--argument` `<arg>`|Quick redefine that sets `%{ARG}` for use in `RUN*_ARG` scripts (if defined) |
+| `-a` \| `--argument` `<arg>`|Quick redefine that sets `%{ARG}` for use in `RUN*_ARG` scripts (if defined). If you have multiple arguments, use `--` and put all your arguments after that |
 | `-q` \| `--quote`       |Quote all scripts and servers files|
-| `-S` \| `--separator` `<str>` |The separation characters between folded and grouped items. (default is double space)|
+| `-S` \| `--separator` `<str>` |The separation characters between folded and between grouped items. (default is double space)|
 | `-t` \| `--test` `<arg>` | Final test before a RUN_PRE, RUN and RUN_POST, to validate the combination. You will need RUN*_TEST defined. And if any of those exit with nonzero exitcode, running the rest is aborted.|
 | `-s` \| `--suit` `<suit>` |search for scripts only from this suit. You can also use the environment variable SUIT|
 | `-w` \| `--warnings` |Enable warnings when your script=server combination does not match anything. Set WARNINGS=1 in the configuration file to enable it by default|
-| `-o` \| `--on` `<host>` |Comma separated list of hosts (will create a serverfile for you) for `=#` |
-| `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#` |
+| `-o` \| `--on` `<host>` |Comma separated list of hosts (will create a serverfile for you) For `=#`. Can be used multiple times |
+| `-l` \| `--loop` `<$>` |Loop on comma separated list of serverfiles for `=#`. Can be used multiple times |
 | `-Q` \| `--query` `<var>` |Prints the value of a variable defined in your evidencer.cfg and exits |
 | `-V` \| `--version` | Prints the real file location and version and exits |
-| `-x` \| `--xfilter` |  eXcludeFilter: Filter the servers through RUN_FILTER= to determine if it needs to added in the run, before RUN_PRE. |
-| `-e` \| `--export` | Name of the variables to export to processes using the `RUN*` |
+| `-x` \| `--xfilter` |  eXcludeFilter: Filter the servers through `RUN_FILTER=` to determine if it needs to added in the run; runs before `RUN_PRE`. |
+| `-e` \| `--export` | Name of the variables to export to all processes started with `RUN*`  |
 | `-E` \| `--extra` | USR Modifier (string). Use inside your .cfg as: `"${EXTRA}"` |
 | `-F` \| `--force` | USR Modifier (number). Use inside your .cfg as: `${FORCE}`. Pre set `FORCE=0` in cfg so you get a consistent number: `0` or `1` when set once, `2` when set twice, etc. |
 
+
 options can be anywhere in the commandline (but not after the `--` parameter). Options can be shortened (1st letter) and can be bundled.
+
+You can define your own options by creating a `.evidencer` file and adding the following perlcode:
+
+```
+$OPTIONS{'Y|yes+'} = \$BASECFG{YES};
+$OPTIONS{'N|no+'} = \$BASECFG{NO};
+$OPTIONS{'Z|zip+'} = \$BASECFG{ZIP};
+$OPTIONS{'T|throttle=s'} = \$BASECFG{THROTTLE};
+
+++$DONOTOVERRIDE{THROTTLE};
+++$DONOTOVERRIDE{YES};
+++$DONOTOVERRIDE{NO};
+```
+And now you can define `THROTTLE=10` in your configuration file, but override that value with `-T`
+```
+$ ./evidencer -T 34 -Q THROTTLE
+THROTTLE=34
+```
 
 ## QUERY
 
