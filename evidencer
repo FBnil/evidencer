@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r160';
+my $VERSION = '0.9r162';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -187,11 +187,12 @@ sub readCFG
 		say "readCFG($NEWCFG,$NEWSUIT)=$_CFGFILE" if $BASECFG{'VERBOSE'} && !$opt_help && !$opt_complete;
 		open( my $CFH, '<', $_CFGFILE ) or abort("$_CFGFILE $!");
 		my %DIRS = map { $_ => 1 } qw(TEMP);
+		my $line;
 		while (<$CFH>) {
 			next if /^#/ || !/=/;
 			chomp;
 			s/\s+$//;
-			$_.=$_[0] while(s/\\\s*$// && chomp($_[0]=<$CFH>));
+			$_.=$line while(s/\\\s*$// && chomp($line=<$CFH>));
 			if (/^ALIAS\s+([^=]+)\s*=\s*(.*)\s*/s) {
 				$CFG{'ALIAS'}{$1} = $2;
 			}elsif(/^EXPORT\s*=\s*(.*)\s*$/){
@@ -683,12 +684,14 @@ sub getscripts
 }
 
 # Each argument can give us a combination test+servers, so we unite the list (to remove duplicates)
-for my $argv (@ARGV) {
+my $arg_n = 0;
+while($arg_n <= $#ARGV) {
 
+	my $argv = $ARGV[$arg_n];
 	# Should the argument have come quoted and is more than one, then split and add it to the loop
 	$argv = unalias($argv);
 	if ( index( $argv, ' ' ) > -1 ) {
-		push @ARGV, split / +/, $argv;
+		splice @ARGV, $arg_n, 1, split / +/, $argv;
 		next;
 	}
 
@@ -719,6 +722,25 @@ for my $argv (@ARGV) {
 	say "Processing: suit($suit) scripts($scripts) hoststr($hoststr)" if $CFG{'VERBOSE'};
 
 	my %SCRIPT_FILES = getscripts( $suit, $scripts, $hoststr, $argv );
+
+	if(scalar keys %SCRIPT_FILES > 1){
+		my %scriptnames;
+		for my $k (keys %SCRIPT_FILES){
+			$k=~s/=.*//;
+			++$scriptnames{$k};
+		}
+		if (scalar keys %scriptnames > 1){
+		say "Multiple scripts match $scripts individualizing." if $CFG{'VERBOSE'};
+		my %multiscripts;
+		for my $k (sort keys %SCRIPT_FILES){
+			my $s_svr = $argv; $s_svr =~ s/^.*?=//;
+			my $s_arg = $k; $s_arg =~ s/=.*//;
+			++$multiscripts{$s_arg . '=' .$s_svr};
+		}
+		splice @ARGV, $arg_n, 1, sort keys %multiscripts;
+		next;
+		}
+	}
 
 # Now loop over all scripts and make sure they do not overlap tests. For example, say:
 # You have test1=VM+ and test1=VM-ET, so the servergroup VM-ET matches both, clearly it is better to run test1=VM-ET
@@ -900,6 +922,7 @@ for my $argv (@ARGV) {
 			}
 		}
 	}
+	++$arg_n;
 }
 
 # If running actions were defered (because of folding/grouping/bundling), run them now
