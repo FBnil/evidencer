@@ -25,7 +25,9 @@ my $cfgF = "$TDIR/evidencer.cfg";
 createfile($cfgF,
   'RUN=echo "%{RUNSCRIPTFQ} on %{RUNSERVERFQ}"',
   'ALIAS ALTERNATIVE1=RUN=on %{RUNSERVERFQ} run %{RUNSCRIPTFQ}',
-  'RUN_ARG=echo "%{RUNSCRIPTFQ} on %{RUNSERVERFQ} with argument %{ARG}"'
+  'RUN_ARG=echo "%{RUNSCRIPTFQ} on %{RUNSERVERFQ} with argument %{ARG}"',
+  '/show=&RUN:={,}&RUN_ARG:={,}&RUN_PRE:={,}&RUN_START:={,}&RUN_FINISH:={,}',
+  '/norun=&RUN:={,}&RUN_ARG:=',
 );
 
 
@@ -57,7 +59,10 @@ for my $d (keys %S){
     createfile($FN, @{$S{$d}{$f}} );
   }
 }
+say "Now creating PR file";
 createfile("$TDIR/servers/PR",qw(svr3pr svr4pr));
+
+say "=== Set up complete. Starting tests ===";
 
 @_ = `$exe $cfg TEST1= -d -v |grep -v '# RUN:'|grep RUN`;
 say @_;
@@ -216,13 +221,23 @@ subtest 'Test completion' => sub {
 	like($_[0], qr/^VM-ET$/, 'Completion4: VM-ET matches 1');
 };
 
+
+subtest 'Test Query' => sub {
+  plan tests => 2;
+ 	@_ = `$exe $cfg -Q /show,/norun`;
+	say @_;
+	is($#_,2-1,'Query1: No regexp, despite two slashes');
+	like($_[0], qr/^.norun=.RUN.=/, 'Query1: First line is /norun (alphabetical)');
+};
+
 done_testing();
 
 sub createfile{
   my $fname = shift @_;
-  say "creating $fname";
-  open(FI,'>',$fname) or BAIL_OUT($fname." ".$!);
-  say FI $_ for @_;
-  close(FI)  or BAIL_OUT($fname." ".$!);
+  print "creating $fname (with ".($#_+1)." lines)... ";
+  open(my $FI,'>',$fname) or BAIL_OUT($fname." ".$!);
+  say $FI $_ for @_;
+  close($FI)  or BAIL_OUT($fname." ".$!);
   chmod 0755, $fname; # scripts need to be executable
+  say " done."
 }
