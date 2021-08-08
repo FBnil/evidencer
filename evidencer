@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r162';
+my $VERSION = '0.9r163';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -723,6 +723,8 @@ while($arg_n <= $#ARGV) {
 
 	my %SCRIPT_FILES = getscripts( $suit, $scripts, $hoststr, $argv );
 
+	# after adding in %SCRIPT_FILES what combinations we run, we check if we have multiple scripts
+	# If we do, then we separate them, because we could have separate configuration files.
 	if(scalar keys %SCRIPT_FILES > 1){
 		my %scriptnames;
 		for my $k (keys %SCRIPT_FILES){
@@ -1272,7 +1274,7 @@ sub redefine
 		if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
 			xexpand( $_[1], '%\{(\w+)\}', \%CFG );
 		}
-		if($_[0]=~s/!$//){
+		if($_[0]=~s/:$//){
 			++$DONOTOVERRIDE{ $_[0] };
 			# $BASECFG{ $_[0] } = $_[1]; 
 		}
@@ -1713,7 +1715,7 @@ TIP: You can use EXPORT= or -e multiple times. Note that use of -e deletes all E
 
 =head1 REDEFINE
 
-You can redefine variables. If they are with an ! then they become unmutable and won't be overriden internally.
+You can redefine variables. If they are defined with a := then they become unmutable and won't be overriden internally.
 
 Example:
 
@@ -1725,7 +1727,7 @@ RUNNAMES=os.show.boottime+os.show.cpu+os.show.free+os.show.uptime
 
 And that would be a weird destination directory, but if you redefine it like this:
 
-$ ./evidencer os.show.*=localhost  -Q RUNNAMES -f -r RUNNAMES!=all_OS
+$ ./evidencer os.show.*=localhost  -Q RUNNAMES -f -r RUNNAMES:=all_OS
 RUNNAMES=all_OS
 
 Then because of the RUN= ... --bg-log-dir "/home/nilton/CODE/PERL/evidencer/results/${RUNNAMES}" ...
@@ -1743,7 +1745,7 @@ Which action you can ALIAS in your evidencer.cfg configuration file:
 
 # or like: ./evidencer test=serverlist -r /show    (order is not important, -r is always first)
 
-ALIAS /show=&RUN!={,}&RUN_ARG!={,}&RUN_PRE!={,}&RUN_START!={,}&RUN_FINISH!={,}
+ALIAS /show=&RUN:={,}&RUN_ARG:={,}&RUN_PRE:={,}&RUN_START:={,}&RUN_FINISH:={,}
 
 Note: For this to work, your post action should be configured to display something.
 

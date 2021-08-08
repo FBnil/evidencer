@@ -557,7 +557,7 @@ You can also disable/enable settings, for example if folding is enabled in the C
 ./evidencer -r FOLD=0 ...
 ```
 
-
+note: Some variables are being redefined internally in each loop, in order to make your commandline redefininition unmutable, use a `:=` instead of `=`
 
 ### QUOTE
 If you have a path with spaces, it is useful to quote them before using them, to do this, use `--quote` The default is a single quote. You can override this by setting `QUOTESTR`. Note that setting the `QUOTESTR` by itself will not automatically enabled quoting. 
@@ -777,8 +777,8 @@ MAXAGESECS=$((${MAXAGE}*24*60*60))
 FILTER_AGE= NOW=$(date +%s); AGE=$(stat -c %Y "%{OUTPUTDIR}/%{SERVER}"); DIFF=$(($AGE - $NOW + ${MAXAGESECS})); [ $DIFF -lt 0 ]
 # Skip if the file exists
 FILTER_EXISTS= [ ! -f "%{OUTPUTDIR}/%{SERVER}" ]
-ALIAS /skipifnew=&RUN_FILTER!=%{FILTER_AGE}{,}XFILTER!=1
-ALIAS /skipifexists=&RUN_FILTER!=%{FILTER_EXISTS}{,}XFILTER!=1
+ALIAS /skipifnew=&RUN_FILTER:=%{FILTER_AGE}{,}XFILTER:=1
+ALIAS /skipifexists=&RUN_FILTER:=%{FILTER_EXISTS}{,}XFILTER:=1
 
 
 ```
