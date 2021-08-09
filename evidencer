@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r163';
+my $VERSION = '0.9r164';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -701,6 +701,7 @@ while($arg_n <= $#ARGV) {
 	if($argv=~s/^&//){
 		push @{$CFG{'REDEFINE'}}, $argv;
 		&redefine();
+		++$arg_n;
 		next;
 	}
 
