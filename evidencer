@@ -4,12 +4,12 @@ use warnings;
 use Getopt::Long qw(:config no_ignore_case no_getopt_compat); # https://perldoc.perl.org/Getopt::Long.txt
 Getopt::Long::Configure("bundling");
 BEGIN {no warnings; $Pod::Usage::Formatter = 'Pod::Text::Termcap'; }
-use Pod::Usage;
+use Pod::Usage qw( pod2usage );
 use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r164';
+my $VERSION = '0.9r165';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -50,7 +50,6 @@ our %BASECFG  = (
 	'C:W' => "\033[1;37m", # WHITE
 	'C:A' => "\033[2;37m", # GRAY
 	'C:Z' => "\033[7;1m", # INVERT
-
 	'C:O' => "\033[38;5;208m", # ORANGE (might not be available on all terminals)
 	NOCOLORS => 0, # set to 2 in the evidencer.cfg file to totally disable colored help
 );
@@ -65,7 +64,7 @@ our %OPTIONS = (
 	'man!'          => \$opt_man,
 	'complete!'     => \$opt_complete,
 	'c|config=s'    => \$CFGFILE,
-	'D|DEBUG'       => \$BASECFG{DEBUG},
+	'D|DEBUG+'      => \$BASECFG{DEBUG},
 	'v|verbose'     => \$BASECFG{VERBOSE},
 	'd|dryrun'      => \$BASECFG{DRYRUN},
 	'U|UTC'         => \$BASECFG{UTC},
@@ -94,6 +93,7 @@ our %OPTIONS = (
 );
 
 # Do not override these from configuration file if set from the commandline through params
+# When using redefine: -r VAR:=VALUE it automatically adds it here
 our %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
 
 # Try to read ./.evidencer if it exists and execute it. (use it to add parameter functions)
@@ -102,6 +102,7 @@ $dotme =~s{^.*/\K}{.};
 do $dotme if -f $dotme;
 
 
+# if COMP_CWORD is defined, then tab-expansion is active. We process the options without removing them from @ARGV
 if(defined $ENV{'COMP_CWORD'} ){
 	# Now we do need a change in behavior if a suit is loaded, because we have other tests
 	# so we need to process the incomplete commandline, but preserve it at the same time.
@@ -119,7 +120,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 		$BASECFG{ARG} = join " ", @_;
 	}
 
-	GetOptions(%OPTIONS) or pod2usage( -verbose => 0 );
+	GetOptions(%OPTIONS) or pod2usage(1);
 
 	die "$me Version $VERSION\n" if $opt_version || (!@ARGV && $BASECFG{VERBOSE} && $num_args < 1);
 
@@ -145,7 +146,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 	}
 }
 
-# Read configuration file
+# Read configuration file(s)
 sub readCFG
 {
 	my ( $NEWCFG, $NEWSUIT ) = @_;
@@ -221,7 +222,7 @@ readCFG( $CFGFILE, $SUIT ) if $SUIT;
 
 
 
-# Get variables defined in the .cfg file, and print them out.
+# Get variables defined in the .cfg file, and print them out. (if no other arguments are given)
 sub doQuery{
 	my @want;
 	$_=~/,/? push(@want, split(/\s*,\s*/, $_)):push(@want,$_)  for @{$BASECFG{'QUERY'}};
@@ -486,6 +487,7 @@ if ($opt_complete)
 	exit;
 }
 
+# Create directory
 sub md
 {
 	if ( !-d $_[0] ) {
@@ -498,6 +500,7 @@ sub md
 	}
 }
 
+# if -C is used, we create a directory structure for a suit
 if ( $CFG{'CREATEDIRS'} ) {
 	$SUIT = $SUIT || $CFG{'SUIT'};
 	my $c = 0;
@@ -535,6 +538,7 @@ if ( $CFG{'CREATEDIRS'} ) {
 pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITSDIR'}\n" )
   unless -d $CFG{'SUITSDIR'};
 
+# if the -o option is used, create a servers/tmp.lst file and put all servers in that file; then act as normal.
 if ( defined $BASECFG{'ON'} ) {
     my $tempserverfile = $CFG{'TMPFILE'}? $CFG{'TMPFILE'} : 'tmp.lst';
     my $tempserverfilefq = $CFG{'SUITSDIR'} .'/'. $SUIT .'/'. $CFG{'SERVERS'} .'/'. $tempserverfile;
@@ -550,6 +554,7 @@ if ( defined $BASECFG{'ON'} ) {
     push @{$BASECFG{'LOOP'}}, $tempserverfile;
 }
 
+# We have done all pre-checks, we start running (unless we do a -Q query)
 runit('RUN_START') unless defined $BASECFG{'QUERY'};
 
 # Split argument string into suit, scripts and hoststr (suit:scripts=+@hoststr)
@@ -1045,7 +1050,7 @@ sub unalias
 	return $str;
 }
 
-
+# Now execute all RUN_* script in the predefined order (unless -Q was used, then we just print the variables)
 sub executerun
 {
 	doQuery if defined $BASECFG{'QUERY'};
@@ -1148,7 +1153,7 @@ sub xexpand
 	$_[0];
 }
 
-# Expand everything for a string
+# Expand everything for a string. If -d is used, then do not expand ${} just yet, as the values might be undefined.
 sub xexpandAll
 {
 	my($v,$isdryrun) = @_;
@@ -1184,6 +1189,7 @@ sub updateTime
 	$v->{"TOTALTIME"} = time - $^T;                        # total seconds running
 }
 
+# Read a file into an array, with optional filtering
 # use $_recursed=-1 to read verbatim
 sub readfiletoarray
 {
@@ -1229,6 +1235,7 @@ sub UnDeepCopy
 	%COPY;
 }
 
+# Get a directory listing as an array
 sub getdir
 {
     if (! -d $_[0] && $CFG{'WARNINGS'}){
@@ -1243,6 +1250,7 @@ sub getdir
 	@list;
 }
 
+# Process all -r redefine statements.
 sub redefine
 {
 	my $n=-1;
@@ -1308,6 +1316,8 @@ sub export{
 	}
 }
 
+# Helper function when a range is given, for example: TEST=SERVERLIST@#1-4 (first 4 entries in SERVERLIST)
+# Negative numbers start at the end
 sub checkrange
 {
 	my(($start,$range,$end,$counter,$max)) = @_;
@@ -1326,7 +1336,7 @@ sub checkrange
 	}
 }
 
-# Unfinished attempt at making our own pod.
+# Unfinished attempt at making our own pod. This is required when the perlpod module is not installed.
 sub pod3usage{
 	no warnings;
 		my $exe;
