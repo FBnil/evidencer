@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r165';
+my $VERSION = '0.9r166';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -541,7 +541,7 @@ pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITSDI
 # if the -o option is used, create a servers/tmp.lst file and put all servers in that file; then act as normal.
 if ( defined $BASECFG{'ON'} ) {
     my $tempserverfile = $CFG{'TMPFILE'}? $CFG{'TMPFILE'} : 'tmp.lst';
-    my $tempserverfilefq = $CFG{'SUITSDIR'} .'/'. $SUIT .'/'. $CFG{'SERVERS'} .'/'. $tempserverfile;
+    my $tempserverfilefq = $CFG{'SUITSDIR'} .'/'. ($SUIT||$CFG{'SUIT'}) .'/'. $CFG{'SERVERS'} .'/'. $tempserverfile;
     say "Saving ON list to $tempserverfilefq" if $CFG{'DEBUG'};
     open(my $sfh, '>', $tempserverfilefq) or die "FATAL: $tempserverfilefq $!";
     for my $on (@{$BASECFG{'ON'}}){
@@ -1336,7 +1336,7 @@ sub checkrange
 	}
 }
 
-# Unfinished attempt at making our own pod. This is required when the perlpod module is not installed.
+# Attempt at making our own pod. This is required when the perl-doc package is not installed.
 sub pod3usage{
 	no warnings;
 		my $exe;
