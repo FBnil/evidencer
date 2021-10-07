@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '0.9r166';
+my $VERSION = '1.0r167';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
