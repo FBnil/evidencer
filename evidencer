@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r167';
+my $VERSION = '1.0r168';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -653,7 +653,7 @@ sub getscripts
 		if($last_only){
 			push( @REG_SERVERS, map basename($_->[0]),
 			sort { $b->[1] <=> $a->[1] } map [ $_, +(stat $_)[9] ],
-			grep $_ ne '.' && $_ ne '..', glob( $serversdir . '/' . '*' ) );
+			grep $_ ne '.' && $_ ne '..' && -f $_, glob( $serversdir . '/' . '*' ) );
 			@REG_SERVERS = ($scripts = $REG_SERVERS[0] || "");
 		}else{
 			push( @REG_SERVERS, map { basename($_) } glob( $serversdir . '/' . $reg_server ) );
