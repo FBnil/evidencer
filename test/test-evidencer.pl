@@ -40,7 +40,7 @@ my %S = (
   'servers' => {
     'VM-ET' => [ qw(svr1et svr1pr) ],
     'VM-PR' =>[ qw(svr1pr svr2pr) ],
-    'VM-PR-DMZ' =>[ qw(svr1dmz svr2dmz) ],
+    'VM-PR-DMZ' =>[ "svr1dmz Prod DMZ Primary", map{ "${_} Prod DMZ BACKUP"} glob("{svr}{2,3}{dmz}") ],
   },
   'scripts' => {
     'TEST1=++ET' => ['echo "Test1 for ET"'],
@@ -51,6 +51,17 @@ my %S = (
 );
 
 #say Dumper \%S;
+
+sub execute{
+	my($cmdstr) = @_;
+	my $strlen = length $cmdstr;
+	say;
+	say "#" x ($strlen + 4);
+	say "# " . $cmdstr ." #";
+	say "#" x ($strlen + 4);
+	say;
+	return `$cmdstr`;
+}
 
 # Create datafiles
 for my $d (keys %S){
@@ -64,26 +75,26 @@ createfile("$TDIR/servers/PR",qw(svr3pr svr4pr));
 
 say "=== Set up complete. Starting tests ===";
 
-@_ = `$exe $cfg TEST1= -d -v |grep -v '# RUN:'|grep RUN`;
+@_ = execute("$exe $cfg TEST1= -d -v |grep -v '# RUN:'|grep RUN");
 say @_;
 is($#_,2-1,'two lines 1');
 like($_[0], qr/TEST1=\+\+ET on VM-ET/, 'TEST1 on ET');
 like($_[1], qr/TEST1=\+\+PR on VM-PR/, 'TEST1 on PR');
 
 
-@_ = `$exe $cfg =++ET -d -v |grep -v '# RUN:'|grep RUN`;
+@_ = execute("$exe $cfg =++ET -d -v |grep -v '# RUN:'|grep RUN");
 say @_;
 is($#_,2-1,'two lines 2');
 like($_[0], qr/TEST1=\+\+ET on VM-ET/, 'TEST1 on ET');
 like($_[1], qr/TEST2=\+\+ET on VM-ET/, 'TEST2 on ET');
 
 
-@_ = `$exe $cfg TEST1=++PR -d -v |grep -v '# RUN:'|grep RUN`;
+@_ = execute("$exe $cfg TEST1=++PR -d -v |grep -v '# RUN:'|grep RUN");
 say @_;
 is($#_,1-1,'one line');
 like($_[0], qr/TEST1=\+\+PR on VM-PR/, 'TEST1 on PR');
 
-@_ = `$exe $cfg TEST2=++PR+ -d -v |grep -v '# RUN:'|grep RUN`;
+@_ = execute("$exe $cfg TEST2=++PR+ -d -v |grep -v '# RUN:'|grep RUN");
 say @_;
 is($#_,2-1,'two lines dmz');
 like($_[0], qr/TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR');
@@ -92,7 +103,7 @@ like($_[1], qr/TEST2=\+\+PR\+ on VM-PR-DMZ/, 'TEST2 on PR with dmz');
 subtest 'Grouping' => sub {
   plan tests => 2;
 
-  @_ = `$exe $cfg TEST2=++PR+ -g -d -v |grep -v '# RUN:'|grep RUN`;
+  @_ = execute("$exe $cfg TEST2=++PR+ -g -d -v |grep -v '# RUN:'|grep RUN");
   say @_;
   is($#_,1-1,'one line grouped');
   like($_[0], qr/TEST2=\+\+PR\+ on VM-PR  VM-PR-DMZ/, 'grouped');
@@ -101,7 +112,7 @@ subtest 'Grouping' => sub {
 subtest 'Folding1' => sub {
   plan tests => 3;
 
-  @_ = `$exe $cfg =++ET -f -d -v |grep -v '# RUN:'|grep -e RUN -e echo`;
+  @_ = execute("$exe $cfg =++ET -f -d -v |grep -v '# RUN:'|grep -e RUN -e echo");
   say @_;
   is($#_,2-1,'two lines folded');
   like($_[0], qr/TEST1=\+\+ET  TEST2=\+\+ET on VM-ET/, 'folded');
@@ -113,7 +124,7 @@ subtest 'Folding1' => sub {
 subtest 'bundling parameters' => sub {
   plan tests => 3;
 
-  @_ = `$exe $cfg =++ET -fdv |grep -v '# RUN:'|grep -e RUN -e echo`;
+  @_ = execute("$exe $cfg =++ET -fdv |grep -v '# RUN:'|grep -e RUN -e echo");
   say @_;
   is($#_,2-1,'two lines bundled');
   like($_[0], qr/TEST1=\+\+ET  TEST2=\+\+ET on VM-ET/, 'bundling');
@@ -124,7 +135,7 @@ subtest 'bundling parameters' => sub {
 
 subtest 'serverregexp' => sub {
   plan tests => 2;
-  @_ = `$exe $cfg =++ET\@svr1et -d -v |grep -v '# RUN:'|grep RUN`;
+  @_ = execute("$exe $cfg =++ET\@svr1et -d -v |grep -v '# RUN:'|grep RUN");
   say @_;
   like($_[0], qr/BUILDTEST:TEST1=\+\+ET on BUILDTEST#TEST1=\+\+ET#VM-ET/, 'newserverfile1');
   like($_[1], qr/BUILDTEST:TEST2=\+\+ET on BUILDTEST#TEST2=\+\+ET#VM-ET/, 'newserverfile2');
@@ -132,7 +143,7 @@ subtest 'serverregexp' => sub {
 
 subtest 'redefine' => sub {
   plan tests => 2;
-  @_ = `$exe $cfg =++ET\@svr1et -d -v -r ALTERNATIVE1 |grep ^on`;
+  @_ = execute("$exe $cfg =++ET\@svr1et -d -v -r ALTERNATIVE1 |grep ^on");
   say @_;
   like($_[0], qr!on /.*/BUILDTEST#TEST1=\+\+ET#VM-ET#\d+ run /.*/BUILDTEST/scripts/TEST1=\+\+ET!, 'alternative1a');
   like($_[1], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ run /.*/BUILDTEST/scripts/TEST2=\+\+ET!, 'alternative1b');
@@ -140,28 +151,28 @@ subtest 'redefine' => sub {
 
 subtest 'argument1' => sub {
   plan tests => 2;
-  @_ = `$exe $cfg TEST2=++ET\@svr1et -d -v -- --fantastic 4 |grep ^echo`;
+  @_ = execute("$exe $cfg TEST2=++ET\@svr1et -d -v -- --fantastic 4 |grep ^echo");
   say @_;
   like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument --fantastic 4!, 'argument1a');
-  @_ = `$exe $cfg TEST2=++ET\@svr1et -d -v -a incredible |grep ^echo`;
+  @_ = execute("$exe $cfg TEST2=++ET\@svr1et -d -v -a incredible |grep ^echo");
   say @_;
   like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument incredible!, 'argument2a');
 };
 
-@_ = `$exe $cfg =# -dv |grep -v '# RUN:'|grep RUN`;
+@_ = execute("$exe $cfg =# -dv |grep -v '# RUN:'|grep RUN");
 say @_;
 is($#_,2-1,'hash is latest (PR)');
 like($_[0], qr/BUILDTEST:TEST1=\+\+ET on PR/, 'TEST1 on PR hash');
 like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on PR/, 'TEST2 on PR hash');
 
-@_ = `$exe $cfg =# -dv -l VM-PR |grep -v '# RUN:'|grep RUN`;
+@_ = execute("$exe $cfg =# -dv -l VM-PR |grep -v '# RUN:'|grep RUN");
 say @_;
 is($#_,2-1,'Test --loop 1');
 unlike($_[0], qr/DMZ/, 'TEST1 on PR through --loop 1 - no DMZ match');
 unlike($_[0], qr/BUILDTEST:TEST1=\+\+ET on VM-PR/, 'TEST1 on PR through --loop 1');
 like($_[1],   qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 on PR through --loop 1');
 
-@_ = `$exe $cfg =# -v -l VM-PR |grep -v '# RUN:'|grep RUN`;
+@_ = execute("$exe $cfg =# -v -l VM-PR |grep -v '#('|grep RUN");
 say @_;
 is($#_,2-1,'Test --loop 2');
 unlike($_[0], qr/DMZ/, 'TEST1 on PR through --loop 2 - no DMZ match');
@@ -187,12 +198,12 @@ subtest 'LOOPs are same as not using loops' => sub {
 
 subtest 'Test accuracy of new regexp' => sub {
   plan tests => 8;
-	@_ = `$exe $cfg 'TEST[12]=+PR' -v |grep -v '# RUN:'|grep RUN`;
+	@_ = execute("$exe $cfg 'TEST[12]=+PR' -v |grep -v '#('|grep RUN");
 	say @_;
 	is($#_,2-1,'two lines for output accuracy');
 	like($_[0], qr/BUILDTEST:TEST1=\+\+PR on VM-PR/, 'TEST1 accuracy test with new rexexp PR');
 	like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on VM-PR/, 'TEST2 accuracy test with new rexexp PR');
-	@_ = `$exe $cfg 'TEST[12]=+PR,+ET' -v |grep -v '# RUN:'|grep RUN`;
+	@_ = execute("$exe $cfg 'TEST[12]=+PR,+ET' -v |grep -v '#('|grep RUN");
 	say @_;
 	is($#_,4-1,'four lines for output accuracy');
 	like($_[1], qr/BUILDTEST:TEST1=\+\+PR on VM-PR/, 'TEST1 accuracy test with new rexexp PR - multiple');
@@ -203,19 +214,19 @@ subtest 'Test accuracy of new regexp' => sub {
 
 subtest 'Test completion' => sub {
   plan tests => 8;
- 	@_ = `COMP_CWORD=7 $exe --completion $cfg ./evidencer --complete evidencer +1 =`; # ./evidencer +1=
+ 	@_ = execute("COMP_CWORD=7 $exe --completion $cfg ./evidencer --complete evidencer +1 ="); # ./evidencer +1=
 	say @_;
 	is($#_,1-1,'Completion1: one lines of results');
 	like($_[0], qr/^TEST1=VM-ET TEST1=VM-PR$/, 'Completion1: test1 only matches 2');
- 	@_ = `COMP_CWORD=7 $exe --completion $cfg ./evidencer --complete evidencer +2 =`; # ./evidencer +2=
+ 	@_ = execute("COMP_CWORD=7 $exe --completion $cfg ./evidencer --complete evidencer +2 ="); # ./evidencer +2=
 	say @_;
 	is($#_,1-1,'Completion2: one lines of results');
 	like($_[0], qr/^TEST2=VM-ET TEST2=VM-PR TEST2=VM-PR-DMZ$/, 'Completion2: test2 matches 3');
- 	@_ = `COMP_CWORD=9 $exe --completion $cfg ./evidencer --complete evidencer +2 = +DMZ`; # ./evidencer +2=+DMZ
+ 	@_ = execute("COMP_CWORD=9 $exe --completion $cfg ./evidencer --complete evidencer +2 = +DMZ"); # ./evidencer +2=+DMZ
 	say @_;
 	is($#_,1-1,'Completion3: one lines of results');
 	like($_[0], qr/^VM-PR-DMZ$/, 'Completion3: DMZ matches 1');
- 	@_ = `COMP_CWORD=9 $exe --completion $cfg ./evidencer --complete evidencer TEST1 = VM-ET`; # ./evidencer TEST1=VM-ET
+ 	@_ = execute("COMP_CWORD=9 $exe --completion $cfg ./evidencer --complete evidencer TEST1 = VM-ET"); # ./evidencer TEST1=VM-ET
 	say @_;
 	is($#_,1-1,'Completion4: one lines of results');
 	like($_[0], qr/^VM-ET$/, 'Completion4: VM-ET matches 1');
@@ -229,6 +240,38 @@ subtest 'Test Query' => sub {
 	is($#_,2-1,'Query1: No regexp, despite two slashes');
 	like($_[0], qr/^.norun=.RUN.=/, 'Query1: First line is /norun (alphabetical)');
 };
+
+
+subtest 'Named hosts' => sub {
+  plan tests => 4;
+
+	@_ = execute("$exe $cfg TEST2=VM-PR-DMZ\@BACK -Dvd |grep -i look ");
+	say @_;
+	is($#_,3-1,'three lines - named ');
+	like($_[0], qr/no$/, 'Primary does not match');
+	like($_[1], qr/yes$/, 'Backup matches 1');
+	like($_[2], qr/yes$/, 'Backup matches 2');
+};
+
+subtest 'MAXMATCHES' => sub {
+  plan tests => 6;
+
+	@_ = execute("$exe $cfg = -v -r MAXMATCHES=3 2>&1 | grep FATAL:");
+	say @_;
+	is($#_,1-1,'one line - MAXMATCHES 1');
+	like($_[0], qr/matches more tha/, 'Too many matches 1');
+
+	@_ = execute("$exe $cfg TEST1= -v -r MAXMATCHES=1 2>&1 | grep FATAL:");
+	say @_;
+	is($#_,1-1,'one line - MAXMATCHES 2');
+	like($_[0], qr/matches more tha/, 'Too many matches 2');
+
+	@_ = execute("$exe $cfg =VM-PR+ -v -r MAXMATCHES=2 2>&1 | grep FATAL:");
+	say @_;
+	is($#_,1-1,'one line - MAXMATCHES 3');
+	like($_[0], qr/matches more tha/, 'Too many matches 3');
+};
+
 
 done_testing();
 
