@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r168';
+my $VERSION = '1.0r170';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -24,6 +24,8 @@ my $me; # holds my absolute filename
 	my $abslnk = $lnk =~m{^/};
 	$me = dirname( abs_path( $MELINKED ? ($abslnk? '' : dirname($0).'/').$lnk : $0 ) ) . '/' . basename($0);
 }
+
+
 our %BASECFG  = (
 	PID       => $$,
 	N         => 0,
@@ -54,7 +56,7 @@ our %BASECFG  = (
 	NOCOLORS => 0, # set to 2 in the evidencer.cfg file to totally disable colored help
 );
 
-my $SUIT = $ENV{'SUIT'} || "";
+my $SUIT = $ENV{'SUIT'} // "";
 $SUIT = $1 if ( !$SUIT && getcwd() =~ m{/suits/(\w+)} );
 
 my ( $opt_help, $opt_man, $opt_complete, $opt_version );
@@ -100,7 +102,6 @@ our %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
 my $dotme = $me;
 $dotme =~s{^.*/\K}{.};
 do $dotme if -f $dotme;
-
 
 # if COMP_CWORD is defined, then tab-expansion is active. We process the options without removing them from @ARGV
 if(defined $ENV{'COMP_CWORD'} ){
@@ -220,7 +221,7 @@ readCFG( $CFGFILE ); # Read toplevel evidencer.cfg only for CFGDIR
 $BASECFG{'CFGDIR'} = $CFG{'CFGDIR'} if $CFG{'CFGDIR'} ne $BASECFG{'CFGDIR'};
 readCFG( $CFGFILE, $SUIT ) if $SUIT;
 
-
+$CFG{'DEBUG'}=0 if defined $ENV{'COMP_CWORD'} ;
 
 # Get variables defined in the .cfg file, and print them out. (if no other arguments are given)
 sub doQuery{
@@ -262,7 +263,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	my $search = pop @ARGV; # only consider the last argument parameter given
 	$search =~ s/=.*//; # remove the server part, if there
 
-	# Deep search for a word inside anny comments in the scripts, and display that method
+	# Deep search for a word inside any comments in the scripts, and display that method
 	my $better = $search=~s/\+//;
 	if($better){
 		for my $k (@methods){
@@ -574,10 +575,11 @@ sub getSuitAndScriptsAndHostStr
 		$scripts = unalias($scripts);
 	}
 
-	# make a proper scripts (add =* if not there)
+	# make a proper scripts (add =* if not there, unless -o)
 	$scripts .= '=' if index( $scripts, '=' ) == -1;
+	$scripts =~ s/=$/=#/ if defined $BASECFG{'ON'};
 	$scripts =~ s/=$/=*/;
-	$scripts =~ s/^=/*=/;
+	$scripts =~ s/^=/*=/; # It's a bad idea once you have many scripts
 
 	# allow for ALIASes to have %{} variables, and be expanded inside $scripts
 	if ( index( $scripts, "%{" ) > -1 ) {
@@ -597,8 +599,8 @@ sub getscripts
 	# define the ./scripts/ and ./servers/ directories for this query (depends on the $suit)
 	my $scriptsdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SCRIPTS'};
 	my $serversdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
-	say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts) hoststr=($hoststr)"
-		if $CFG{'DEBUG'};
+	{no warnings; say "scriptsdir=($scriptsdir) suit=($suit) scripts=($scripts) hoststr=($hoststr)"
+		if $CFG{'DEBUG'}; };
 	$scriptsdir = abs_path($scriptsdir)
 		|| pod2usage( -verbose => 0, -message => "$0: SCRIPTS directory required $scriptsdir\n" );
 	$serversdir = abs_path($serversdir)
@@ -682,6 +684,8 @@ sub getscripts
 				@{ $SCRIPT_FILES{ $suit . ':' . $script }{'!'} } = split /,/, $hoststr;
 			}
 		}
+		abort("FATAL: $scripts matches more than MAXMATCHES=$CFG{'MAXMATCHES'} (use '-r MAXMATCHES=n' to override)")
+			if defined $CFG{'MAXMATCHES'} && $matches > $CFG{'MAXMATCHES'} && !defined $ENV{'COMP_CWORD'};
 	}
 	warn "No scripts and server files found for $scripts ($argv)\n"
 		if ( @REG_SCRIPTS && !$matches && $CFG{'WARNINGS'} && !defined $ENV{'COMP_CWORD'} );
@@ -1116,7 +1120,7 @@ sub runit
 			}
 			say $_ if $CFG{'VERBOSE'};
 			my $ec = system $_;
-			say " # ExitCode=$?" if $CFG{'VERBOSE'};
+			say " #($KEY) ExitCode=$?" if $CFG{'VERBOSE'};
 			if ( !$not_started_yet ){
 				$CFG{'TOTALERRORS'} = $BASECFG{'TOTALERRORS'} += 1 if $CFG{'ERRORCODE'} = $ec >> 8;
 				runit( $KEY . "_FAIL", 1 ) if ( $ec && $KEY !~ /_FAIL$/ && $CFG{ $KEY . "_FAIL" } );
@@ -1416,7 +1420,26 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
  If unsure, escape or quote your servergroup and use dryrun.
 
  @hostnames regexp's are not un-ALIAS-ed.
- 
+
+ If your servers are IP adresses, you can also use descriptions, like so:
+
+ 10.2.0.1 frontend server 1
+ 10.2.0.2 frontend server 2
+ 10.2.0.3 backend server 1
+ 10.2.0.4 backend server 2
+
+ Then you can select the frontend server like so:
+
+$ ./evidencer OS.yum.update=MYSERVERS@frontend
+
+ The filtering will remove everything after the first space and only keep the first item.
+ For more complex regexp's, use quotes (to prevent the shell interpreting them), like so:
+
+$ ./evidencer OS.yum.update=MYSERVERS@'(back|front).*1'  -Dvd
+
+ This would match 10.2.0.1 (frontend server 1) and 10.2.0.3 (backend server 1). Case insensitive.
+ Use `-Dvd` to see the matches, but not execute the statements (Debug, verbose, dryrun)
+
  You must have a configuration file that tells evidencer what to do with the script and the servergroup. So it at least needs a RUN= statement in that configuration file.
 
 
@@ -1452,7 +1475,7 @@ If you have B<SUIT_LINK=1> and/or B<SUIT_CFG=1> in your configuration file, then
 Evidencer needs a configuration file to work.
 
 There are 3 level of configuration files: the toplevel, evidencer.cfg, then inside a suit, also
-named evidencer.cfg, and then per script, the name of the script up to the = and then .cfg
+named evidencer.cfg, and then per script, the name of the script up to the = and then .cfg (permissions non executable)
 
 Note that the lowest level is always merged with the configuration above; this way you can only configure the differences.
 
@@ -1493,6 +1516,7 @@ If for some reason, you want the ./servers/ directory name to be different, you 
 =item B<SCRIPTS>
 
 If for some reason, you want the ./scripts/ directory name to be different, you can override this name. For example, to use ssh-batch. That program uses inline as the directory name. The default is B<SCRIPTS=scripts>
+I'd recommend using inlines to have each start with an unique letter, and making it easier to change directories.
 
 =item B<RESULTS>
 
@@ -1592,6 +1616,10 @@ Execute this string in the shell to test the validity of the script+server combi
 
 Execute this string in the shell
 
+=item B<RUN_POST_TEST>
+
+Execute this string in the shell. Runs before RUN_POST
+
 =item B<RUN_POST>
 
 Execute this string in the shell. Runs after RUN
@@ -1624,7 +1652,9 @@ The fatal errormessage will be available to RUN_ABORT to do something with it (f
 
 Execute this string in the shell when a fatal error occurred: When evidencer could not read or create a file it needs to run
 
+=item B<MAXMATCHES>
 
+When you run a script without a servergroup, and you can potentially run it on hunderds of serverfiles, prevent it by setting a maximum. You can redefine it in the commandline with: `-r MAXMATCHES=5`
 
 =back
 
@@ -1681,6 +1711,8 @@ You can also query ALIASes. Like many of the variables that accept multiple para
 $ ./evidencer -Q TIME -r 'TIME="%{YEAR}-%{MONTH}-%{DAY} %{HH}:%{MM} %{WD}/7 %{YD}/365 %{WN}/52"'
 
 TIME="2021-07-17 23:56 6/7 198/365 29/52"
+
+to see all time related variables, run:  grep -F '$v->{' ./evidencer
 
 
 $ ./evidencer -Q SCRIPTS,/q -Q NOW
@@ -1802,6 +1834,8 @@ Note that <0> is not a color but the name of the script for which the help is be
 
 #+: <Y>Example: <L:> ./<.> <0>=# <:>
 
+Note: Scripts pushed by ssh-batch have a few constructs that can not be used (as they have to be converted to single line, hence they are also called inline scripts). See ssh-batch documentation for which. Don't worry, In practice, most work.
+
 =head1 TAB EXPANSION
 
 You can activate tab expansion for evidencer by putting the following in your ~/.bashrc:
@@ -1837,7 +1871,7 @@ Evidencer is only an orchestrator. It needs a commandline remote execution tool.
 
 =head1 USAGE
 
-./evidencer [options] [script]=[serversfile]@substr
+./evidencer [options] [script]=[serversfile]@substr [ -- <params> ]
 
 You need: scripts, serversfiles and a configured ssh-batch.
 
