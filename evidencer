@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r174';
+my $VERSION = '1.0r183';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -1687,7 +1687,7 @@ The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
 
  [OPT         DESCRIPTION]
 
- -h | --help | -?   Print Options and Arguments.
+ -h | --help | -?   Print Options and Usage.
  --man              Print complete man page.
  -v | --verbose     Log more to the screen. Sets VERBOSE=1
  -D | --DEBUG       Log a bit more to the screen. Sets DEBUG=1
@@ -1877,13 +1877,13 @@ Tip: the newest file in ./servers/ is aliased to #, so to run a script on all th
 Tab expansion works for ALIASes starting with / and for suits and for scripts=serverslist. You can use a trailing + to use a substring as the regexp (it also activates ignorecase) and as an AND to find a script or as a wildcard to just match multiple scripts; in the latter case, add a = to end the script part and expand possible serversfiles for the scripts matched. If you do not like the normal working of tab expansion (that trims up to the first dot, thus not showing you full script names), use a single plus as the parameter, then double-tab. 
 
 
-=head1 Arguments
+=head2 Script Arguments
 
 You can define arguments for your inline scripts. 
 
 ./evidencer os.show.boottime=# -a CET
 
-Multiple argumens require multiple `-a` or you can use -- for ease:
+Multiple arguments require multiple `-a` or you can use -- for ease:
 
 ./evidencer os.show.boottime=# -a arg1 -a arg2
 
@@ -1891,6 +1891,7 @@ Multiple argumens require multiple `-a` or you can use -- for ease:
 
 ./evidencer os.show.boottime=# -- arg1 arg2
 
+Note: Mixing multiple scripts means they all get these same paramters (if they use them)
 
 =head1 LICENSE AND COPYRIGHT
 
@@ -1904,7 +1905,7 @@ Evidencer is only an orchestrator. It needs a commandline remote execution tool.
 
 =head1 USAGE
 
-./evidencer [options] [script]=[serversfile]@substr [-- <args>]
+./evidencer [opts] [suit:][script]=[serversfile]@regexp [-- <args>]
 
 You need: scripts, serversfiles and a configured ssh-batch.
 
