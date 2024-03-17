@@ -115,10 +115,15 @@ EOF
 
 chmod +x scripts/*
 
-for t in VM-PR VM-PR-DMZ VM-ET ;do
+for t in VM-PR VM-PR-DMZ ;do
 	echo -e "server1\nserver2\nserver3" > servers/${t}
 done
 echo -e "127.0.0.1" > servers/localhost
+
+echo "server1 frontend server 2" > servers/VM-ET
+echo "server2 backend server 1" >> servers/VM-ET
+echo "server3 backend server 2" >> servers/VM-ET
+echo "server4 frontend server 1" >> servers/VM-ET
 
 # Create a suit structure
 ./evidencer -C -s DEMO
@@ -131,7 +136,6 @@ echo "Extracting ./scripts/os.show.boottime=+"
 cat << 'EOF' > ./scripts/os.show.boottime=+
 #!/usr/bin/env bash
 ARG=$1
-#ARG2=$2 # unused
 
 _TZ=UTC
 if [ -z "$ARG" ];then
@@ -149,22 +153,27 @@ fi
 # This is a normal comment. This will not be displayed in the help.
 # When transmitting scripts through ssh-batch, all comments are skipped, so you do not waste bandwidth.
 
+# Print out the Linux reported timezone
+CTZ=$(TZ=${_TZ} date +%Z)
 # Here we try a who -b, but if you have an older Linux, the -b option does not exist. In that case
 # Try uptime -s
-echo $((TZ=${_TZ} who -b||TZ=${_TZ} uptime -s) | sed -e 's/^[[:space:]]*//') $ARG
+echo $((TZ=${_TZ} who -b||TZ=${_TZ} uptime -s) | sed -e 's/^[[:space:]]*//') $CTZ
 
 # Help can be added in any position of the script. In this case, I put it almost at the end.
 
 #: Show the Linux boot time in the selected timezone.
-#: The default TimeZone is <B>UTC, which you can change with a parameter.
-#: you can select from the following deprecated timezones:
-#: <B>CET <B>IST <B>EST <B>EST5EDT <B>PRC <B>ROC <B>ROK
-#=: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>CET
-#=: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>Europe/Lisbon
-#=: <C>See: <A>https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+#: The default TimeZone is <B>UTC, which you can change with a <B>parameter.
+#+: you can select from the following deprecated timezones:
+#+: <B>CET <B>IST <B>EST <B>EST5EDT <B>PRC <B>ROC <B>ROK
+#+: Note: During CEST, CET will mean CEST.
+#+: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>CET
+#+: <Y>Example: <L>./evidencer <L>os.show.boottime=# <L>-- <L>Europe/Lisbon
+#+: <C>See: <A>https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 #+: So instead of <B>WET you need to use <B>Europe/Lisbon (although WET still works)
 
-last reboot |head -4
+# Throw in a bit of reboot history, for good measure:
+TZ=$_TZ last reboot |head -4
+
 
 EOF
 
