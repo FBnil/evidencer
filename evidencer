@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r170';
+my $VERSION = '1.0r172';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -83,7 +83,7 @@ our %OPTIONS = (
 	'r|redefine=s@' => \$BASECFG{REDEFINE},
 	's|suit=s'      => \$SUIT,
 	'S|separator=s' => \$BASECFG{SEPARATOR},
-	'a|argument=s'  => \$BASECFG{ARG},
+	'a|argument=s@'  => \$BASECFG{ARG},
 	'q|quote'       => \$BASECFG{QUOTE},
 	't|test=s'      => \$BASECFG{TEST},
 	'w|warnings'    => \$BASECFG{WARNINGS},
@@ -118,7 +118,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 		while ( ( $_ = pop @ARGV ) !~ /^(?:\-\-|—)$/ ) {
 			unshift @_, $_;
 		}
-		$BASECFG{ARG} = join " ", @_;
+		@{$BASECFG{ARG}} = @_;
 	}
 
 	GetOptions(%OPTIONS) or pod2usage(1);
@@ -140,10 +140,16 @@ if(defined $ENV{'COMP_CWORD'} ){
 		}
 	}
 
-
 	# Make sure at least one argument provided
 	if ( !$opt_complete && !@ARGV && !$BASECFG{'CREATEDIRS'} && !$BASECFG{'QUERY'} ) {
 		pod2usage( -verbose => 0, -message => "$0: one argument required" );
+	}
+}
+
+# Convert Arguments array to space separated string
+if ( $BASECFG{'ARG'} ) {
+	if ( ref $BASECFG{'ARG'} eq "ARRAY" ) {
+		$BASECFG{'ARG'} = join " ", @{ $BASECFG{'ARG'} };
 	}
 }
 
@@ -245,6 +251,8 @@ sub doQuery{
 	&cleanup();
 	exit;
 }
+
+
 &doQuery() if defined $BASECFG{'QUERY'} && !@ARGV;
 
 %_CFG = UnDeepCopy( \%CFG );    # Backup real base configuration so each test can change it
@@ -554,6 +562,7 @@ if ( defined $BASECFG{'ON'} ) {
     close $sfh;
     push @{$BASECFG{'LOOP'}}, $tempserverfile;
 }
+
 
 # We have done all pre-checks, we start running (unless we do a -Q query)
 runit('RUN_START') unless defined $BASECFG{'QUERY'};
@@ -1058,14 +1067,9 @@ sub unalias
 sub executerun
 {
 	doQuery if defined $BASECFG{'QUERY'};
-	if ( $CFG{'ARG'} ) {
-		if ( ref $CFG{'ARG'} eq "ARRAY" ) {
-			$CFG{'ARG'} = join " ", @{ $CFG{'ARG'} };
-		}
-	}
 	if ( $CFG{'VERBOSE'} ) {
 		say "# RUN($CFG{'ARGV'}) $CFG{RUNSUIT}:$CFG{RUNSCRIPT} on $CFG{RUNSERVER}"
-		  . ( $CFG{'ARG'} ? " with argument '$CFG{ARG}'" : "" )." RUNNAME=$CFG{RUNNAME} RUNNAMES=$CFG{RUNNAMES}";
+		  . ( defined $CFG{'ARG'} ? " with argument '$CFG{ARG}'" : "" )." RUNNAME=$CFG{RUNNAME} RUNNAMES=$CFG{RUNNAMES}";
 		say "# SCRIPT=$CFG{RUNSCRIPTFQ}";
 		say "# SERVER=$CFG{RUNSERVERFQ}";
 	}
@@ -1076,7 +1080,7 @@ sub executerun
 	for my $run ( glob "RUN{_PRE,,_POST}{_TEST,}" ) {
 		next if $run =~ /_TEST$/ && !defined $CFG{'TEST'};
 	  REDO:
-		if ( $CFG{'ARG'} && defined $CFG{ $run . "_ARG" } ) {
+		if ( defined $CFG{'ARG'} && defined $CFG{ $run . "_ARG" } ) {
 			$EC = runit( $run . "_ARG", $run ne "RUN_PRE" );    # update time only for RUN_PRE
 		} else {
 			$EC = runit( $run, $run ne "RUN_PRE" );             # update time only for RUN_PRE
@@ -1685,7 +1689,7 @@ The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
  -g | --group       Group by Servergroups. Sets GROUP=1
  -b | --bundle      Concatenate all scripts/servers if they are folded or grouped, into a new file. Sets BUNDLE=1
  -r | --redefine  $ Override a variable from evidencer.cfg (can be used multiple times)
- -a | --argument  $ Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined).
+ -a | --argument  $ Quick redefine that sets %{ARG} for use in RUN*_ARG scripts (if defined). Also: --
  -q | --quote       Quote your scripts and servers using %{QUOTESTR}. Handy for fold and group.
  -S | --separator $ The separation characters between folded and grouped items. (default is double space). Sets SEPARATOR
  -t | --test  <$>   Final test against a RUN (either before or after RUN_PRE) to validate the combination
@@ -1859,6 +1863,12 @@ Tip: the newest file in ./servers/ is aliased to #, so to run a script on all th
 
 Tab expansion works for ALIASes starting with / and for suits and for scripts=serverslist. You can use a trailing + to use a substring as the regexp (it also activates ignorecase) and as an AND to find a script or as a wildcard to just match multiple scripts; in the latter case, add a = to end the script part and expand possible serversfiles for the scripts matched. If you do not like the normal working of tab expansion (that trims up to the first dot, thus not showing you full script names), use a single plus as the parameter, then double-tab. 
 
+
+=head1 Arguments
+
+./evidencer os.show.boottime=# -a CET
+
+
 =head1 LICENSE AND COPYRIGHT
 
 This software is released under the Unlicense statement.
@@ -1871,7 +1881,7 @@ Evidencer is only an orchestrator. It needs a commandline remote execution tool.
 
 =head1 USAGE
 
-./evidencer [options] [script]=[serversfile]@substr [ -- <params> ]
+./evidencer [options] [script]=[serversfile]@substr [ -- <args> ]
 
 You need: scripts, serversfiles and a configured ssh-batch.
 
