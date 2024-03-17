@@ -7,7 +7,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 
 ## Usage
 ```
- evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...>] [--help]
+ evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...>] [--help] [ -- <args> ]
 ```
 ### OPTIONS
 
@@ -29,7 +29,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-f` \| `--fold` |Group by Scripts|
 | `-g` \| `--group` |Group by Servergroups|
 | `-b` \| `--bundle` |Concatenate all scripts/servers if they are folded or grouped|
-| `-r` \| `--redefine` `<var=val>`|Override a variable from evidencer.cfg (can be used multiple times)|
+| `-r` \| `--redefine` `<var=val>`|Override a variable from evidencer.cfg (`-r` can be used multiple times)|
 | `-a` \| `--argument` `<arg>`|Quick redefine that sets `%{ARG}` for use in `RUN*_ARG` scripts (if defined). If you have multiple arguments, use `--` and put all your arguments after that |
 | `-q` \| `--quote`       |Quote all scripts and servers files|
 | `-S` \| `--separator` `<str>` |The separation characters between folded and between grouped items. (default is double space)|
