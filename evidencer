@@ -726,7 +726,11 @@ while($arg_n <= $#ARGV) {
 	# Replace =# with the -l loop serverscripts (can be comma separated)
 	if(defined $BASECFG{'LOOP'}){
 		my $svrs = join ",", @{$BASECFG{'LOOP'}};
-		grep s/=\K#/$svrs/e,$argv;
+		if($argv=~/=/){
+			grep s/=\K#?$/$svrs/e,$argv;
+		}else{
+			$argv.= '='.$svrs;
+		}
 	}
 
 	%CFG = UnDeepCopy( \%_CFG ) if $#ARGV;    # only restore if more than one test
@@ -952,7 +956,7 @@ while($arg_n <= $#ARGV) {
 
 # If running actions were defered (because of folding/grouping/bundling), run them now
 if (%DEFER) {
-
+	say "CONTINUE Defered execution" if $CFG{'DEBUG'};
 	if ( $CFG{'GROUP'} ) {
 		for my $script ( keys %DEFER ) {
 			my $str = join $CFG{'SEPARATOR'}, sort keys %{ $DEFER{$script} };
@@ -977,6 +981,7 @@ if (%DEFER) {
 
 	$CFG{'RUNNAMES'} = join '+', grep { s{.\S*/}{}g; s{=\S*}{}g; s/\s+/+/g; } sort keys %DEFER unless $DONOTOVERRIDE{'RUNNAMES'};
 
+	my %SEEN;
 	for my $scripts ( $CFG{'FOLD'}? sort keys %DEFER : @DEFERARR) {
 		$CFG{'RUNSCRIPTFQ'} = $scripts;
 		for my $servers ( sort keys %{ $DEFER{$scripts} } ) {
@@ -996,6 +1001,7 @@ if (%DEFER) {
 					open( my $FOUT, '>', $CFG{'RUNSCRIPTFQ'} ) or abort("$CFG{RUNSCRIPTFQ}: $!");
 					for my $file ( split /$CFG{'SEPARATOR'}/, $scripts ) {
 						say "## BUNDLING SCRIPT $file" if $CFG{'DEBUG'};
+						next if $SEEN{$file."=".$servers}++;
 						say $FOUT $_ for readfiletoarray($file);
 					}
 					close $FOUT;
@@ -1014,7 +1020,10 @@ if (%DEFER) {
 					open( my $FOUT, '>', $CFG{'RUNSERVERFQ'} ) or abort("$CFG{RUNSERVERFQ}: $!");
 					for my $file ( split /$CFG{SEPARATOR}/, $servers ) {
 						say "## BUNDLING SERVER $file" if $CFG{'DEBUG'};
-						say $FOUT $_ for readfiletoarray($file);
+						for $_ (readfiletoarray($file)){
+							next if $SEEN{$scripts."=".$_}++;
+							say $FOUT $_;
+						}
 					}
 					close $FOUT;
 				}
