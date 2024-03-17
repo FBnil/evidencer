@@ -254,7 +254,7 @@ subtest 'Named hosts' => sub {
 };
 
 subtest 'MAXMATCHES' => sub {
-  plan tests => 6;
+  plan tests => 8;
 
 	@_ = execute("$exe $cfg = -v -r MAXMATCHES=3 2>&1 | grep FATAL:");
 	say @_;
@@ -270,6 +270,12 @@ subtest 'MAXMATCHES' => sub {
 	say @_;
 	is($#_,1-1,'one line - MAXMATCHES 3');
 	like($_[0], qr/matches more tha/, 'Too many matches 3');
+
+
+	@_ = execute("$exe $cfg =VM-PR+ -v -r MAXMATCHES=6 2>&1 | grep FATAL:");
+	say @_;
+	is($#_,0-1,'zero lines - MAXMATCHES 4');
+	unlike($_[0], qr/matches more tha/, '(Not) too many matches 4');
 };
 
 
