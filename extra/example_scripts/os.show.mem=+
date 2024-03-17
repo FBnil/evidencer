@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+ARG=$1
+echo "ARG($ARG)"
+PREALLOCATED=350000
+if [ ! -z "$ARG" ];then
+	PREALLOCATED=$ARG
+fi
+
+echo "PREALLOCATED=$PREALLOCATED"
+cat /proc/meminfo |grep MemTotal:
+cat /proc/meminfo |grep MemTotal:|awk '{print $2}' |xargs -I{} echo "scale=1; ({}+$PREALLOCATED) / 1024/1024" |bc
+
+#: Show the Linux Total amount of Memory.
+#+: We've assumed that 350k of address space is snooped off by perifericals and BIOS/UEFI.
+#+: You can override that value with a parameter
+#=: <Y>Example: <L:>./evidencer <0> 
+#+: <Y>Example: <L:>./evidencer <0> -a 315000<:>
+
+# https://serverfault.com/questions/1040981/how-much-physical-ram-is-lost-to-bios-uefi

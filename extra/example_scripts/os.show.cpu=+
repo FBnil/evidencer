@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+lscpu | grep -e "^CPU(s):" | cut -f2 -d: | awk '{print $1}'
+#: Display the number of CPU's a (virtual)machine has.

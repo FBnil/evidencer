@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+ARG=$1
+
+if [ -z "$ARG" ];then
+	free -h
+else
+	free $@
+fi
+
+#: Show the Linux Memory Usage.
+#: The default is <B>-h, Human readable format, which you can change with a parameter.
+#=: See the manual for <B>free for all the options. Some options are:
+#+: <B>-b<:>, <B>--bytes Display the amount of memory in bytes.
+#+: <B>-k<:>, <B>--kibi  Display the amount of memory in kibibytes. (official default)
+#+: <B>-g<:>, <B>--gibi  Display the amount of memory in gibibytes.
+#+: <B>--giga      Display the amount of memory in gigabytes.
+#=: These two expressions are the same:
+#=: <Y>Example: <L:>./evidencer <0> -- -b<:>
+#+: <Y>Example: <L:>./evidencer <0> -a -b<:>
+#=: These two expressions are the same:
+#=: <Y>Example: <L:>./evidencer <0> -- -k -w<:>
+#+: <Y>Example: <L:>./evidencer <0> -a '-k -w'<:>
+#+: <Y>Example: <L:>./evidencer <0> -a -k -a -w<:>
+   
