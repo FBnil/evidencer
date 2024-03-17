@@ -9,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r172';
+my $VERSION = '1.0r174';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -1366,7 +1366,7 @@ sub pod3usage{
 			chomp;
 			next if $skip && !$_ && $skip--;
 			if( s/=head\d (.*)/$BASECFG{'C:B'}$BASECFG{'C:U'}$1$BASECFG{'C:N'}/){
-				say $HOUT $_;
+				say $HOUT $_."\n";
 				++$skip;
 				next;
 			}else{
@@ -1870,7 +1870,17 @@ Tab expansion works for ALIASes starting with / and for suits and for scripts=se
 
 =head1 Arguments
 
+You can define arguments for your inline scripts. 
+
 ./evidencer os.show.boottime=# -a CET
+
+Multiple argumens require multiple `-a` or you can use -- for ease:
+
+./evidencer os.show.boottime=# -a arg1 -a arg2
+
+./evidencer os.show.boottime=# -a 'arg1 arg2'
+
+./evidencer os.show.boottime=# -- arg1 arg2
 
 
 =head1 LICENSE AND COPYRIGHT
@@ -1885,7 +1895,7 @@ Evidencer is only an orchestrator. It needs a commandline remote execution tool.
 
 =head1 USAGE
 
-./evidencer [options] [script]=[serversfile]@substr [ -- <args> ]
+./evidencer [options] [script]=[serversfile]@substr [-- <args>]
 
 You need: scripts, serversfiles and a configured ssh-batch.
 
