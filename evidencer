@@ -878,6 +878,10 @@ while($arg_n <= $#ARGV) {
 					}
 				}
 
+				# Force server list unique
+				@read_servers = do { my %seen; grep { !$seen{$_}++ } @servers };
+				@servers = @read_servers;
+
 				if ($CFG{'XFILTER'}){
 					abort("Undefined RUN_FILTER in the configuration file") unless defined $CFG{'RUN_FILTER'};
 					@read_servers = @servers;
