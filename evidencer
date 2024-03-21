@@ -47,12 +47,12 @@ our %BASECFG  = (
 	'C:G' => "\033[1;32m", # GREEN
 	'C:Y' => "\033[1;33m", # YELLOW
 	'C:L' => "\033[1;34m", # BLUE
-	'C:P' => "\033[1;35m", # PURPLE (officially Magenta)
+	'C:P' => "\033[1;35m", # PURPLE (Officially Magenta)
 	'C:C' => "\033[1;36m", # CYAN
 	'C:W' => "\033[1;37m", # WHITE
 	'C:A' => "\033[2;37m", # GRAY
 	'C:Z' => "\033[7;1m", # INVERT
-	'C:O' => "\033[38;5;208m", # ORANGE (might not be available on all terminals)
+	'C:O' => "\033[38;5;208m", # ORANGE (available on some terminals)
 	NOCOLORS => 0, # set to 2 in the evidencer.cfg file to totally disable colored help
 );
 
@@ -275,7 +275,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	my $better = $search=~s/\+//;
 	if($better){
 		for my $k (@methods){
-			++$K{$k} if readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1,"#.*$search");
+			++$K{$k} if readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1,"#.*(?i)$search");
 		}
 		@methods = keys %K; # show help for all methods found with the searchterm
 	}else{
@@ -1365,7 +1365,6 @@ sub pod3usage{
 		$exe="$_ -R" if(($_="/usr/bin/less") && -x $_);
 		#$exe="$_ -l -" if(($_="/usr/bin/man") && -x $_);
 
-		# ./evidencer --man -r NOCOLORS=2
 		if($BASECFG{'REDEFINE'}[0]=~/NOCOLORS/){
 			$BASECFG{$_}="" for grep {/C:/} keys %BASECFG;
 		}
@@ -1825,11 +1824,11 @@ The scripts can have lines that start with #: (viewable with -h) or #+: (viewabl
 For example:
 ./evidencer spoon -hv
 
-If you are making your own help text inside scripts, then you can add colors with <C>, 
+If you are making your own help text inside scripts, then you can add colors with <C>,
 where C is a character, or a number. The available characters are viewable with:
 B<grep C: evidencer |grep 033 |grep =>
 
-You can span using a colon:   <B:> ... <:> 
+You can span using a colon:   <B:> ... <:>
 
 You can set background colors with dot:  <1.> .. <:>
 
@@ -1843,7 +1842,7 @@ You can put this variable also in your evidencer.cfg file:
 
 # NOCOLORS=1    # Only headers are bold, the rest is monochromatic
 
-# NOCOLORS=2    # fully monochromatic, useful for storing in a text file.
+# NOCOLORS=2    # fully monochromatic, useful for storing to textfile
 
 If you start your help with: #=:  It means it starts a new paragraph (adds a newline above).
 If you start your help with: #!:  It means the line is separated by a newline above and below.
@@ -1852,6 +1851,14 @@ Note that <0> is not a color but the name of the script for which the help is be
 #+: <Y>Example: <L:> ./<.> <0>=# <:>
 
 Note: Scripts pushed by ssh-batch have a few constructs that can not be used (as they have to be converted to single line, hence they are also called inline scripts). See ssh-batch documentation for which. Don't worry, In practice, most work.
+
+Search for scripts with 'spoon' in their title
+./evidencer spoon -hv
+
+Search inside all help lines for the regexp 'spoon'
+./evidencer spoon+ -hv
+
+Searches are case insensitive
 
 =head1 TAB EXPANSION
 
@@ -1911,6 +1918,6 @@ You need: scripts, serversfiles and a configured ssh-batch.
 
 Short help: ./evidencer -h
 
-Long help:  ./evidencer --man [-F]
+Long help:  ./evidencer --man [-F] [-r NOCOLORS]
 
 =cut
