@@ -35,6 +35,7 @@ our %BASECFG  = (
 	ARG       => undef,
 	QUOTESTR  => "'",
 	CFGDIR    => "",
+	VERBOSE   => 0,
 	TOTALERRORS => 0,
 	# COLORS
 	'C:'  => "\033[0m", # Normal
@@ -127,7 +128,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 
 	pod2usage( -verbose => 1 ) if defined $opt_help && !@ARGV;
 	if(defined $opt_man){
-		# pod2use works well on machines that have perl-doc installed. If it's not installed, 
+		# pod2use works well on machines that have perl-doc installed. If it's not installed,
 		# it shows the whole program, not just the manual. If not installed (debian 10 does not,
 		# RHEL 8.x does), the perldoc is a small stub. We detect it, and roll our own documentation.
 		# Or else, it needs to be installed, for example:
@@ -149,7 +150,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 # Convert Arguments array to space separated string
 if ( $BASECFG{'ARG'} ) {
 	if ( ref $BASECFG{'ARG'} eq "ARRAY" ) {
-		$BASECFG{'ARG'} = join " ", @{ $BASECFG{'ARG'} };
+		$BASECFG{'ARG'} = join '  ', @{$BASECFG{'ARG'}};
 	}
 }
 
@@ -206,7 +207,7 @@ sub readCFG
 			}elsif(/^EXPORT\s*=\s*(.*)\s*$/){
 				push @{$CFG{'EXPORT'}}, $1; # comma split later
 			} else {
-				my ( $k, $v ) = split /=/, $_, 2;
+				my ( $k, $v ) = split /\s*=/, $_, 2;
 				$v = xexpand( $v, '%\{(\w+)\}', \%CFG ) if index( $v, "%{" ) > -1;
 				$v = abs_path($v) if $DIRS{$k};
 				$v=~s/\\033/\033/ if $k=~/^C:/;
@@ -245,7 +246,7 @@ sub doQuery{
 		}
 	}
 
-	say $_.'='.(defined $CFG{$_}? xexpandAll($CFG{$_}) : "") for sort keys %found; # bug: /\033/\\033/g 
+	say $_.'='.(defined $CFG{$_}? xexpandAll($CFG{$_}) : "") for sort keys %found; # bug: /\033/\\033/g
 	say $_.'='.(defined $CFG{'ALIAS'}{$_}? xexpandAll($CFG{'ALIAS'}{$_}) : "") for sort keys %found_alias;
 
 	&cleanup();
@@ -351,7 +352,7 @@ if ($opt_complete)
 			say join " ", @candidates;
 		}},
 	);
- 
+
 	for my $short_opt (keys %PX){
 		for my $long_opt (keys %{$PX{$short_opt}}){
 			if(($search eq $short_opt || $search eq $long_opt)
@@ -418,8 +419,6 @@ if ($opt_complete)
 
 	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
 
-	#my @serverfiles = grep { /=/ && -x "${SUITDIR}$CFG{'SERVERS'}/$_" } getdir(${SUITDIR}.$CFG{'SERVERS'});
-	
 	if(!@methods && $CFG{'WARNINGS'}){
         warn "You have no executable scripts in ${SUITDIR}$CFG{'SCRIPTS'}. Maybe you forgot chmod +x ?"
 	}
@@ -622,7 +621,7 @@ sub getscripts
 	# Bug: when multiple inlines are run, then it does not clean up the cfg from prev.
 	readCFG($_)
 		if ( ( !$CFGFILE )
-		&& ( -f ( $_ = "$CFG{SUITSDIR}/$suit/$reg_scripts.cfg" ) 
+		&& ( -f ( $_ = "$CFG{SUITSDIR}/$suit/$reg_scripts.cfg" )
 			|| -f ( $_ = "$CFG{SUITSDIR}/$suit/$CFG{CFGDIR}/$reg_scripts.cfg" )) );
 	$CFG{'RUNSCRIPT'} = $reg_scripts; # make it available
 
@@ -885,7 +884,6 @@ while($arg_n <= $#ARGV) {
 				# Force server list unique
 				@read_servers = do { my %seen; grep { !$seen{$_}++ } @servers };
 				@servers = @read_servers;
-
 				if ($CFG{'XFILTER'}){
 					abort("Undefined RUN_FILTER in the configuration file") unless defined $CFG{'RUN_FILTER'};
 					@read_servers = @servers;
@@ -1035,7 +1033,7 @@ if (%DEFER) {
 			my $server = $CFG{'RUNSERVERFQ'};
 			$script =~ s{$CFG{'RUNSCRIPTSDIR'}/}{}g;
 			$server =~ s{$CFG{'RUNSERVERSDIR'}/}{}g;
-			%CFG = %{$_} if defined ($_=$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }) 
+			%CFG = %{$_} if defined ($_=$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} })
 				|| defined ($_=$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ '_' });
 			$CFG{'RUNSCRIPT'} = $script;
 			$CFG{'RUNSERVER'} = $server;
@@ -1304,10 +1302,7 @@ sub redefine
 		if ( defined $_[1] && index( $_[1], "%{" ) > -1 ) {
 			xexpand( $_[1], '%\{(\w+)\}', \%CFG );
 		}
-		if($_[0]=~s/:$//){
-			++$DONOTOVERRIDE{ $_[0] };
-			# $BASECFG{ $_[0] } = $_[1]; 
-		}
+		++$DONOTOVERRIDE{ $_[0] } if $_[0]=~s/:$//;
 		$_CFG{ $_[0] } = $CFG{ $_[0] } = $_[1];
 	}
 }
@@ -1405,13 +1400,13 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
 =head1 DESCRIPTION
 
  evidencer [-s <suit>] [suit:][script]=[servergroup][@<hostnames_regexp,...|#n|#n-m>] [--help]
- 
+
  Example:
 
  # Run, from the suit JAVATRANSACTIONS the test JAVASERVER-SERVICES= for servers JAVA-ET
  # that match the perl regexp javaserver00[1..5] or the substring javaserver0100
  ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
- 
+
  # Run from the 5th on the JAVA-ET@ list to the second last. (use 5--1 or 5- for 5th to last)
  ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@#5--2
 
@@ -1474,7 +1469,7 @@ $ ./evidencer OS.yum.update=MYSERVERS@'(back|front).*1'  -Dvd
 Note: You can edit evidencer.cfg beforehand to redefine these directory names. See section CONFIGURATION
 
 
-to create the top-level directories use the following command: 
+to create the top-level directories use the following command:
 
 ./evidencer -s .. -C
 
@@ -1512,7 +1507,6 @@ The directory where the evidencer binary is located
 
 Configuration directory Defaults to cfg. Can only be defined in the toplevel configuration file (not inside suits). Can place your cfg files in a subdirectory of the SUIT, if you prefer that.
 
-      
 =item B<TEMP>
 
 The directory where temporal files are created. Temporal files are needed when you use @hostnames_regexp, because we need a subset of servers from the content of the servergroup file. The default is a ./temp/ subdirectory where the evidencer script is located.
@@ -1881,12 +1875,12 @@ Tip: the newest file in ./servers/ is aliased to #, so to run a script on all th
 
 ./evidencer os.show.boottime=#
 
-Tab expansion works for ALIASes starting with / and for suits and for scripts=serverslist. You can use a trailing + to use a substring as the regexp (it also activates ignorecase) and as an AND to find a script or as a wildcard to just match multiple scripts; in the latter case, add a = to end the script part and expand possible serversfiles for the scripts matched. If you do not like the normal working of tab expansion (that trims up to the first dot, thus not showing you full script names), use a single plus as the parameter, then double-tab. 
+Tab expansion works for ALIASes starting with / and for suits and for scripts=serverslist. You can use a trailing + to use a substring as the regexp (it also activates ignorecase) and as an AND to find a script or as a wildcard to just match multiple scripts; in the latter case, add a = to end the script part and expand possible serversfiles for the scripts matched. If you do not like the normal working of tab expansion (that trims up to the first dot, thus not showing you full script names), use a single plus as the parameter, then double-tab.
 
 
 =head2 Script Arguments
 
-You can define arguments for your inline scripts. 
+You can define arguments for your inline scripts.
 
 ./evidencer os.show.boottime=# -a CET
 
@@ -1898,7 +1892,7 @@ Multiple arguments require multiple `-a` or you can use -- for ease:
 
 ./evidencer os.show.boottime=# -- arg1 arg2
 
-Note: Mixing multiple scripts means they all get these same paramters (if they use them)
+Note: Mixing multiple scripts means they all get these same parameters (if they use them)
 
 =head1 LICENSE AND COPYRIGHT
 
