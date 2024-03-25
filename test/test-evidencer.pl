@@ -48,6 +48,15 @@ my %S = (
     'TEST1=++PR' => ['echo "Test1 for PR"'],
     'TEST2=++ET' => ['echo "Test2 for ET"'],
     'TEST2=++PR+' => ['echo "Test2 for PR"'],
+    'HELPSCRIPT=NOMATCH' => [
+		'# This is a normal comment',
+		'#: This is a compact help comment',
+		'#+: This is an extended help comment',
+		'#=: This is an extended help comment',
+		'#!: This is an extended help comment',
+		'#?: This is confirmation prompt',
+		'echo "HELPSCRIPT for NOMATCH"'
+	]
   },
 );
 
@@ -133,11 +142,20 @@ subtest 'bundling parameters' => sub {
   
 };
 
+subtest 'scriptregexp' => sub {
+  plan tests => 3;
+  @_ = execute("$exe $cfg TEST+=VM-ET -d -v |grep -v '# RUN:'|grep RUN");
+  is($#_,2-1,'two lines for scriptregexp');
+  like($_[0], qr/BUILDTEST:TEST1=VM-ET.* on VM-ET/, 'scriptregexp1');
+  like($_[1], qr/BUILDTEST:TEST2=VM-ET.* on VM-ET/, 'scriptregexp2');
+  say @_;
+};
 
 subtest 'serverregexp' => sub {
-  plan tests => 2;
+  plan tests => 3;
   @_ = execute("$exe $cfg =++ET\@svr1et -d -v |grep -v '# RUN:'|grep RUN");
   say @_;
+  is($#_,2-1,'two lines for serverregexp');
   like($_[0], qr/BUILDTEST:TEST1=\+\+ET on BUILDTEST#TEST1=\+\+ET#VM-ET/, 'newserverfile1');
   like($_[1], qr/BUILDTEST:TEST2=\+\+ET on BUILDTEST#TEST2=\+\+ET#VM-ET/, 'newserverfile2');
 };
@@ -160,11 +178,11 @@ subtest 'argument1' => sub {
   like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument incredible!, 'argument2a');
 };
 
-@_ = execute("$exe $cfg =# -dv |grep -v '# RUN:'|grep RUN");
+@_ = execute("$exe $cfg =# -y -dv |grep -v '# RUN:'|grep RUN");
 say @_;
-is($#_,2-1,'hash is latest (DUP-PR) alfabetically');
-like($_[0], qr/BUILDTEST:TEST1=\+\+ET on DUP-PR/, 'TEST1 on PR hash');
-like($_[1], qr/BUILDTEST:TEST2=\+\+PR\+ on DUP-PR/, 'TEST2 on PR hash');
+is($#_,3-1,'hash is latest (DUP-PR) alfabetically');
+like($_[1], qr/BUILDTEST:TEST1=\+\+ET on DUP-PR/, 'TEST1 on PR hash');
+like($_[2], qr/BUILDTEST:TEST2=\+\+PR\+ on DUP-PR/, 'TEST2 on PR hash');
 
 @_ = execute("$exe $cfg =# -dv -l VM-PR |grep -v '# RUN:'|grep RUN");
 say @_;
@@ -294,6 +312,34 @@ subtest 'duplicate hosts (-gb)' => sub {
 	like($_[0], qr/2/, 'We have 2 servers, deduplicated');
 };
 
+subtest 'scripthelp' => sub {
+  plan tests => 5;
+
+  @_ = execute("$exe $cfg HELPSCRIPT= -hv");
+  say @_;
+  is($#_,11-1,'11 lines of help');
+  unlike(@_, qr/confirmation/, 'Not confirmation lines');
+
+  @_ = execute("$exe $cfg HELPSCRIPT= -h");
+  say @_;
+  is($#_,5-1,'5 lines of help (padding and title)');
+  like($_[1], qr/HELPSCRIPT/, 'help title');
+  like($_[3], qr/compact/, 'Only compact lines');
+};
+
+subtest 'scriptconfirm' => sub {
+  plan tests => 4;
+
+  @_ = execute("yes | $exe $cfg HELPSCRIPT=NOMATCH");
+  say @_;
+  is($#_,1-1,'1 lines of output');
+  like($_[0], qr/confirmation/, 'Confirmation line, approval through pipe');
+
+  @_ = execute("$exe $cfg HELPSCRIPT=NOMATCH -y");
+  say @_;
+  is($#_,1-1,'1 lines of output');
+  unlike($_[0], qr/confirmation/, 'Confirmation line, approval through option parameters');
+};
 
 done_testing();
 
