@@ -29,13 +29,14 @@ my $me; # holds my absolute filename
 our %BASECFG  = (
 	PID       => $$,
 	N         => 0,
+	YN        => "Y/N",
 	UTC       => 0,
-	NEWLINE   => "\n",
-	SEPARATOR => "  ",
 	ARG       => undef,
-	QUOTESTR  => "'",
 	CFGDIR    => "",
+	NEWLINE   => "\n",
 	VERBOSE   => 0,
+	QUOTESTR  => "'",
+	SEPARATOR => "  ",
 	TOTALERRORS => 0,
 	# COLORS
 	'C:'  => "\033[0m", # Normal
@@ -93,6 +94,7 @@ our %OPTIONS = (
 	'o|on=s@'       => \$BASECFG{ON},
 	'V|version'     => \$opt_version,
 	'x|xfilter'     => \$BASECFG{XFILTER},
+	'y|yes'     => \$BASECFG{YES},
 );
 
 # Do not override these from configuration file if set from the commandline through params
@@ -287,7 +289,7 @@ if($opt_help && @ARGV && !$opt_complete) {
 	{ no warnings;
 	for my $k (sort keys %K){
 		my ($title) = split /=/, $k;
-		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#.\?:": "^#:");
+		my @txt = readfiletoarray("${SUITDIR}$CFG{'SCRIPTS'}/$k",-1, $BASECFG{'VERBOSE'}? "^#(?:|[\+\=\!]):": "^#:");
 		next unless @txt;
 		grep s/<0>/$title/g, @txt;
 		grep s/<\.>/basename($0)/ge, @txt;
@@ -827,6 +829,7 @@ while($arg_n <= $#ARGV) {
 				  if $CFG{'DEBUG'};
 				next;
 			}
+
 			my ( $suit, $server ) = split ":", $suitserver, 2;
 			my $serversdir = $CFG{'SUITSDIR'} . '/' . $suit . '/' . $CFG{'SERVERS'};
 			$CFG{'RUNSERVERSDIR'} = $serversdir     = abs_path $serversdir;
@@ -836,6 +839,12 @@ while($arg_n <= $#ARGV) {
 			$CFG{'RUNSERVER'}   = $server;
 			$CFG{'RUNSCRIPTFQ'} = $CFG{'RUNSCRIPTSDIR'} . '/' . $CFG{'RUNSCRIPT'};
 			$CFG{'RUNSERVERFQ'} = $CFG{'RUNSERVERSDIR'} . '/' . $CFG{'RUNSERVER'};
+
+			if (!$BASECFG{YES} && (@_ = readfiletoarray($CFG{'RUNSCRIPTFQ'}, -1, "^#\\?:"))) {
+				$_ = join "\n", map { s/^#.:\s*// ; xexpandAll($_) } @_;
+				print "$suit $CFG{'RUNSCRIPT'} on $CFG{'RUNSERVER'}, $_ ($CFG{YN})";
+				exit unless uc(substr(<STDIN>, 0, 1)) eq uc(substr($CFG{YN}, 0, 1));
+			}
 
 			if ( $CFG{'UNFOLD'} && !defined $RICH{ $CFG{'RUNSERVERFQ'} } ) {
 				if ( !defined $RICH{ $CFG{'RUNSERVERFQ'} } ) {
@@ -1604,7 +1613,7 @@ The name of the scripts file being processed %{RUNSCRIPT}, but stripped of the =
 
 =item B<RUNNAMES>
 
-If you --bundle or --fold you might want to use the + concated scripts names, instead of RUNNAME which will contain only the last one
+If you --bundle or --fold you might want to use the + concated scripts names, instead of RUNNAME which will contain only the last one. If too long, use `-r RUNNAMES:=YOURNAME`
 
 =item B<TEST>
 
@@ -1685,6 +1694,7 @@ The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
  -v | --verbose     Log more to the screen. Sets VERBOSE=1
  -D | --DEBUG       Log a bit more to the screen. Sets DEBUG=1
  -d | --dryrun      Do not execute, but show all that would have been run. Sets DRYRUN=1
+ -y | --yes         When running scripts with confirmation, assume a yes.
  -U | --UTC         timestrings are in UTC instead of localtime. Sets UTC=1
  -C | --createdirs  Create directories if they do not exist
  -c | --config <cfg> Read alternative cfg file
@@ -1812,15 +1822,14 @@ ssh-batch allows for serversfiles that contain serversfiles. For example, you ha
 
 If you rather have this unfolded in evidencer than by ssh-batch (or rundeer, which does not support it), use -u
 
-=head1 SCRIPTS HELP
+=head1 SCRIPTS HELP (#: #+: #=: #!:)
 
 The scripts can have lines that start with #: (viewable with -h) or #+: (viewable with -hv)
 For example:
 ./evidencer spoon -hv
 
 If you are making your own help text inside scripts, then you can add colors with <C>,
-where C is a character, or a number. The available characters are viewable with:
-B<grep C: evidencer |grep 033 |grep =>
+where C is a character, or a number. The available characters are viewable with: B<grep C: evidencer |grep 033 |grep =>
 
 You can span using a colon:   <B:> ... <:>
 
@@ -1853,6 +1862,22 @@ Search inside all help lines for the regexp 'spoon'
 ./evidencer spoon+ -hv
 
 Searches are case insensitive
+
+=head1 YES / SCRIPTS CONFIRMATION REQUEST (#?:)
+
+Scripts, before running, can ask for confirmation. Help coloring is not available, but CFG coloring is.
+Add one or more lines in the script with the following syntax:
+
+#?: %{C:R}Are you sure%{C:}
+
+The question prompt `YN` can be defined in the configuration file. The default is:
+
+YN=Y/N
+
+Only the first letters are matched (from YN and from the user input). Case insensitive.
+
+From the commandline, to not enter a manual confirmation. use the option `-y` or `--yes`
+From a configuration file, use `YES=1` to always skip a confirmation.
 
 =head1 TAB EXPANSION
 
