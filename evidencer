@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case no_getopt_compat); # https://perldoc.perl.org/Getopt::Long.txt
 Getopt::Long::Configure("bundling");
-BEGIN {no warnings; $Pod::Usage::Formatter = 'Pod::Text::Termcap'; }
+BEGIN {no warnings; $Pod::Usage::Formatter = 'Pod::Text::Termcap'}
 use Pod::Usage qw( pod2usage );
 use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
@@ -85,7 +85,7 @@ our %OPTIONS = (
 	'r|redefine=s@' => \$BASECFG{REDEFINE},
 	's|suit=s'      => \$SUIT,
 	'S|separator=s' => \$BASECFG{SEPARATOR},
-	'a|argument=s@'  => \$BASECFG{ARG},
+	'a|argument=s@' => \$BASECFG{ARG},
 	'q|quote'       => \$BASECFG{QUOTE},
 	't|test=s'      => \$BASECFG{TEST},
 	'w|warnings'    => \$BASECFG{WARNINGS},
@@ -94,7 +94,7 @@ our %OPTIONS = (
 	'o|on=s@'       => \$BASECFG{ON},
 	'V|version'     => \$opt_version,
 	'x|xfilter'     => \$BASECFG{XFILTER},
-	'y|yes'     => \$BASECFG{YES},
+	'y|yes'         => \$BASECFG{YES},
 );
 
 # Do not override these from configuration file if set from the commandline through params
@@ -1694,7 +1694,7 @@ The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
  -v | --verbose     Log more to the screen. Sets VERBOSE=1
  -D | --DEBUG       Log a bit more to the screen. Sets DEBUG=1
  -d | --dryrun      Do not execute, but show all that would have been run. Sets DRYRUN=1
- -y | --yes         When running scripts with confirmation, assume a yes.
+ -y | --yes         Assume yes when running scripts with confirmation. Sets YES=1
  -U | --UTC         timestrings are in UTC instead of localtime. Sets UTC=1
  -C | --createdirs  Create directories if they do not exist
  -c | --config <cfg> Read alternative cfg file
