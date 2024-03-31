@@ -2,6 +2,8 @@
 
 <div align="right"><img align="right" src="extra/images/text5051.png" /><sub><sup>Grudge-2-BRK Font courtesy of Brian Kent</sup></sub></div>
 
+<div align="center"><img align="center" src="extra/images/demo.webm" /></div>
+
 Say you have script files in one directory, and lists of files with servernames in the other, and you want to combine those to run certain scripts on certain servergroups. By cleverly naming the scripts and the servergroup files, you restrict what can run where. Add a few filters to select which scripts, and on which servers you want to run these scripts and you get evidencer.
 Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/rundeer)/[ssh-batch](https://github.com/hans-vervaart/ssh-batch) or similar to produce output (results) you can store on the machine you are running from. Store the output with timedate stamps, and the results become historical "evidence".
 
@@ -20,6 +22,7 @@ Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/
 | `-v` \| `--verbose`    |Log more to the screen|
 | `-D` \| `--DEBUG`      |Log a bit more to the screen|
 | `-d` \| `--dryrun`     |Do not execute, but show all that would have been run|
+| `-y` \| `--yes`        |Assume yes when running scripts with confirmation. Sets YES=1|
 | `-U` \| `--UTC`        |timestrings are in UTC instead of localtime |
 | `-C` \| `--createdirs` | Create directories if they do not exist |
 | `-c` \| `--config` `<cfg>`| Read alternative cfg file|
@@ -647,7 +650,7 @@ Note: Tab Expansion is still a bit wonky here and there. (for example, if you go
 
 ## Build in Help
 
-You can add help comments in all scripts in ./scripts/, then, when you have a substring of a script, you can use `-h` to show only the help. Use `-hv` for extended help. To acomplish this you need to have lines that start with `#:` and the extended help lines need to start with `#+:`
+You can add help comments in all scripts in ./scripts/, then, when you have a substring of a script, you can use `-h` to show only the help. Use `-hv` for extended help. To acomplish this you need to have lines that start with `#:` and the extended help lines need to start with `#+:` or `#!:` or `#=:`
 To show all help available, use a dot: `./evidencer . -hv` 
 (you can switch the order of the parameters). Note that you NEED to add any expression (like a dot) or it will default to the internal usage help.
 
@@ -714,6 +717,22 @@ Note that <0> is not a color but the name of the script for which the help is be
 
 
 Note: `ssh-batch` skips all comments before transmitting your code, so you are not increasing IO by adding good documentation.
+
+#### YES / SCRIPTS CONFIRMATION REQUEST (#?:)
+
+Scripts, before running, can ask for confirmation. Help coloring is not available, but CFG coloring is.
+Add one or more lines in the script with the following syntax:
+
+`#?: %{C:R}Are you sure%{C:}`
+
+The question prompt `YN` can be defined in the configuration file. The default is:
+```
+YN=Y/N
+```
+Only the first letters are matched (from YN and from the user input). Case insensitive.
+
+From the commandline, to not enter a manual confirmation. use the option `-y` or `--yes`
+From a configuration file, use `YES=1` to always skip a confirmation.
 
 
 ## Focus on one suit
