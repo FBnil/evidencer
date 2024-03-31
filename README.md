@@ -2,7 +2,7 @@
 
 <div align="right"><img align="right" src="extra/images/text5051.png" /><sub><sup>Grudge-2-BRK Font courtesy of Brian Kent</sup></sub></div>
 
-  <div align="center"><img align="center" src="https://github.com/FBnil/evidencer/raw/master/extra/images/demo.webm" /></div>
+  <div align="center"><img align="center" src="extra/images/demo.webm.mp4" /></div>
 
 Say you have script files in one directory, and lists of files with servernames in the other, and you want to combine those to run certain scripts on certain servergroups. By cleverly naming the scripts and the servergroup files, you restrict what can run where. Add a few filters to select which scripts, and on which servers you want to run these scripts and you get evidencer.
 Combine it with a remote execution tool like [Rundeer](https://github.com/FBnil/rundeer)/[ssh-batch](https://github.com/hans-vervaart/ssh-batch) or similar to produce output (results) you can store on the machine you are running from. Store the output with timedate stamps, and the results become historical "evidence".
