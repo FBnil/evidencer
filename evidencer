@@ -514,9 +514,9 @@ sub md
 if ( $CFG{'CREATEDIRS'} ) {
 	$SUIT = $SUIT || $CFG{'SUIT'};
 	my $c = 0;
-	$c += !!md( $CFG{$_} )                                       for (qw(TEMP SUITSDIR));
+	$c += !!md( $CFG{$_} )                                        for qw(TEMP SUITSDIR CFGDIR);
 	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT );
-	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for (qw(SERVERS SCRIPTS RESULTS));
+	$c += !!md( $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . $CFG{$_} ) for qw(SERVERS SCRIPTS RESULTS);
 	say "$c directories created";
 
 	my $sfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0);
