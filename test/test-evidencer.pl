@@ -21,6 +21,17 @@ system "rm -rf $TDIR" if(-d $TDIR);
 system $exe,'-C','-s','BUILDTEST';
 ok( $? == 0 , 'BUILDTEST directory structure (re)created' );
 
+
+sub createfile{
+  my $fname = shift @_;
+  print "creating $fname (with ".($#_+1)." lines)... ";
+  open(my $FI,'>',$fname) or BAIL_OUT($fname." ".$!);
+  say $FI $_ for @_;
+  close($FI)  or BAIL_OUT($fname." ".$!);
+  chmod 0755, $fname; # scripts need to be executable
+  say " done."
+}
+
 my $cfgF = "$TDIR/evidencer.cfg";
 createfile($cfgF,
   'RUN=echo "%{RUNSCRIPTFQ} on %{RUNSERVERFQ}"',
@@ -29,8 +40,6 @@ createfile($cfgF,
   '/show=&RUN:={,}&RUN_ARG:={,}&RUN_PRE:={,}&RUN_START:={,}&RUN_FINISH:={,}',
   '/norun=&RUN:={,}&RUN_ARG:=',
 );
-
-
 
 
 system $exe '-c',"$TDIR/evidencer.cfg",'-C','-s','BUILDTEST';
@@ -341,14 +350,24 @@ subtest 'scriptconfirm' => sub {
   unlike($_[0], qr/confirmation/, 'Confirmation line, approval through option parameters');
 };
 
-done_testing();
 
-sub createfile{
-  my $fname = shift @_;
-  print "creating $fname (with ".($#_+1)." lines)... ";
-  open(my $FI,'>',$fname) or BAIL_OUT($fname." ".$!);
-  say $FI $_ for @_;
-  close($FI)  or BAIL_OUT($fname." ".$!);
-  chmod 0755, $fname; # scripts need to be executable
-  say " done."
-}
+subtest 'globlize' => sub {
+  plan tests => 21;
+  ok( open(my $EFH, '<', $exe) , 'read $exe globlize' );
+  my @code;
+  while(<$EFH>) {
+    push( @code, $_ ) if /sub globlize/ .. /\}/;
+  }
+  chomp(@code);
+  grep s/\s*#.*//, @code;
+  eval join "", @code;
+  my @P = qw(+ +A +-A A++B  ++  A+ A-+ A+- A-+B +-+-+ ++B A++ A+-B A-+B C--     --C C-   -C D--D  D++D); 
+  my @R = qw(* *A *-A A-*-B *-* A* A-* A*-* A-*B *-*-* *-B A-* A*-B A-*B C-*-* *-*-C C-* *-C D-*-D D-*-D);
+  for(my $i=0;$i<=$#P;++$i){
+    my $v = $P[$i];
+    globlize($v);
+    ok( $v eq $R[$i], "globlize($P[$i]) = $R[$i] => $v ?");
+  }
+};
+
+done_testing();

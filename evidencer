@@ -1101,9 +1101,9 @@ sub executerun
 		next if $run =~ /_TEST$/ && !defined $CFG{'TEST'};
 	  REDO:
 		if ( defined $CFG{'ARG'} && defined $CFG{ $run . "_ARG" } ) {
-			$EC = runit( $run . "_ARG", $run ne "RUN_PRE" );    # update time only for RUN_PRE
+			$EC = runit( $run . "_ARG", $run ne "RUN_PRE" );  # update time only for RUN_PRE
 		} else {
-			$EC = runit( $run, $run ne "RUN_PRE" );             # update time only for RUN_PRE
+			$EC = runit( $run, $run ne "RUN_PRE" );           # update time only for RUN_PRE
 		}
 		if ( $EC && $REDO > 0 && $run eq "RUN" ) {
 			--$REDO;
@@ -1159,10 +1159,9 @@ sub runit
 sub globlize
 {
 	$_[0] =~ s/^(\+\+)|(=\K\+\+)|(\+\+)$/$1||$2?"*-":"-*"/ge; # border ++ to *
-	$_[0] =~ s/\+\+|\-\-/-*-/g;                               # middel ++ to -*-
-	$_[0] =~ s/\+/\*/g;                                       # all other + to *
-	$_[0] =~ s/^\-/\*-/g;                                     # if starts with -, then *-
-	$_[0] =~ s/\-$/-\*/g;                                     # if ends with -, then  -*
+	$_[0] =~ s/^(\-)|(\-)$/$2*$1/g; # border - to *- or -*
+	$_[0] =~ s/\+\+|\-\-/-*-/g;     # middel ++ to -*-
+	$_[0] =~ s/\+/\*/g;             # all other + to *
 }
 
 # xexpands %{} or ${} variables
@@ -1383,7 +1382,7 @@ sub pod3usage{
 				next;
 			}else{
 				s/^=(?:item|over \d+|cut|back)// && ++$skip;
-				s/L<(?:.*\|)?([^>]*)>/$BASECFG{'C:Y'}$1$BASECFG{'C:N'}/g;
+				s/L<(?:.*\|)?([^>]*)>|(Note:|TIP:)/$BASECFG{'C:Y'}$1$2$BASECFG{'C:N'}/g;
 				s/^((?:\$ .*|\.\/.*|eval .*))/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/;
 				s/`(.*?)`/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/g;
 				s/^(#.*)/$BASECFG{'C:A'}$1$BASECFG{'C:N'}/;
@@ -1402,7 +1401,7 @@ __END__
 
 =head1 NAME
 
-evidencer.pl - A program to combine scripts and servers to run scripts on servers.
+evidencer.pl - An orchestrator program to combine scripts and servers to run scripts on servers.
 
 For the full help, see README.md or directly on L<github|https://github.com/FBnil/evidencer>
 
@@ -1428,10 +1427,10 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
    JAVASERVER-SERVICES=  or as  JAVASERVER-SERVICES=+  or even as  JAVASERVER-SERVICES
 
  The servergroup part of a script name, uses a plus sign instead of an asterix, and these are the transformation rules:
- +     ==>  *       ++    ==>  *-*     +-+-+ ==>  *-*-*
- +A    ==>  *A      A+    ==>  A*      ++B   ==>  *-B
- +-A   ==>  *-A     A-+   ==>  A-*     A++   ==>  A-*
- A++B  ==>  A-*-B   A-+B  ==>  A-*B    A+-B  ==>  A*-B
+ +     ==>  *       ++    ==>  *-*     A-   ==>  A-*      -A  ==>  *-A
+ +A    ==>  *A      A+    ==>  A*     ++B   ==>  *-B   +-+-+  ==>  *-*-*
+ +-A   ==>  *-A     A-+   ==>  A-*    A++   ==>  A-*    A++B  ==>  A-*-B
+ A++B  ==>  A-*-B   A-+B  ==>  A-*B   A+-B  ==>  A*-B   A--B  ==>  A-*-B
 
  So if you have a servergroup called APACHE-PROD-DMZ, then =++DMZ would match that group.
  And ++PROD++  would match *-PROD-*. These are glob expansions, which means it would match
@@ -1820,7 +1819,7 @@ ssh-batch allows for serversfiles that contain serversfiles. For example, you ha
 
 ./LINUX
 
-If you rather have this unfolded in evidencer than by ssh-batch (or rundeer, which does not support it), use -u
+If you rather have this unfolded in evidencer than by ssh-batch (or rundeer, which does not support it), use `-u`
 
 =head1 SCRIPTS HELP (#: #+: #=: #!:)
 
@@ -1841,11 +1840,11 @@ If you do not want colors, use NOCOLORS, like so:
 
 You can put this variable also in your evidencer.cfg file:
 
-# NOCOLORS=     # default. Display help with colors
+# NOCOLORS=   # default. Display help with colors
 
-# NOCOLORS=1    # Only headers are bold, the rest is monochromatic
+# NOCOLORS=1  # Only headers are bold, the rest is monochromatic
 
-# NOCOLORS=2    # fully monochromatic, useful for storing to textfile
+# NOCOLORS=2  # fully monochromatic, useful for storing to textfile
 
 If you start your help with: #=:  It means it starts a new paragraph (adds a newline above).
 If you start your help with: #!:  It means the line is separated by a newline above and below.
@@ -1893,7 +1892,7 @@ eval $(./evidencer --complete)
 
 Sometimes expansion does not work, check that there is no other expansion for the binary defined:
 
-`complete |grep evidencer` and delete it with `complete -r evidencer` then try again.
+`complete |grep evidencer`, delete: `complete -r evidencer` then retry.
 
 
 Tip: the newest file in ./servers/ is aliased to #, so to run a script on all the server in that latest file:
