@@ -10,8 +10,17 @@ fi
 
 echo "Downloading ssh-batch and deploying it to ~/bin"
 
+
+# Although smaller, we don't have "head" and could potentially miss important updates
+#[ ! -f ssh-batch.tgz ] && wget -O ssh-batch.tgz https://github.com/FBnil/ssh-batch/releases/download/v1.0/ssh-batch-v1.0.tar.gz
+#mkdir bin 2>/dev/null
+#tar xvf ./ssh-batch.tgz --strip-components=1 -C bin
+
 [ ! -f ssh-batch.zip ] && wget -O ssh-batch.zip https://github.com/FBnil/ssh-batch/archive/refs/heads/master.zip
 unzip -j ssh-batch.zip -d bin
+
+
+
 MERGE=false
 if [ -d ~/bin ];then
 	echo "You already have a ~/bin/ directory, may I add some ssh-batch files to it? (y/n)"
@@ -174,7 +183,7 @@ OUTPUTDIR=$3
 # for each server line in $RUNSERVERFQ we strip out the comments and
 # remove the user. Now we have a pure hostname (long or short), which 
 # has output in $OUTPUTDIR
-for svr in $(cat $RUNSERVERFQ|awk '{print $1}'|sed -e 's/.*@//');do
+for svr in $(cat $RUNSERVERFQ|awk '{print $1}'|sed -e 's/:.*\|.*\^\|.*@//g');do
 	sed -e "s/^/$svr:/" $OUTPUTDIR/$svr |grep -v -e '<ssh_askpass>' 
 done
 
