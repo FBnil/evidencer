@@ -1,6 +1,5 @@
 #!/usr/bin/perl
-use strict;
-use warnings;
+use v5.12; # each(@)
 use Getopt::Long qw(:config no_ignore_case no_getopt_compat); # https://perldoc.perl.org/Getopt::Long.txt
 Getopt::Long::Configure("bundling");
 BEGIN {no warnings; $Pod::Usage::Formatter = 'Pod::Text::Termcap'}
@@ -9,7 +8,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r184';
+my $VERSION = '1.0r206';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -53,7 +52,7 @@ our %BASECFG  = (
 	'C:C' => "\033[1;36m", # CYAN
 	'C:W' => "\033[1;37m", # WHITE
 	'C:A' => "\033[2;37m", # GRAY
-	'C:Z' => "\033[7;1m", # INVERT
+	'C:Z' => "\033[7;1m",  # INVERT
 	'C:O' => "\033[38;5;208m", # ORANGE (available on some terminals)
 	NOCOLORS => 0, # set to 2 in the evidencer.cfg file to totally disable colored help
 );
@@ -108,8 +107,8 @@ do $dotme if -f $dotme;
 
 # if COMP_CWORD is defined, then tab-expansion is active. We process the options without removing them from @ARGV
 if(defined $ENV{'COMP_CWORD'} ){
-	# Now we do need a change in behavior if a suit is loaded, because we have other tests
-	# so we need to process the incomplete commandline, but preserve it at the same time.
+	# Now we do need a change in behavior if a suit is loaded, so we need to process
+	# the incomplete commandline, but preserve it at the same time.
 	my @_ARGV = @ARGV;
 	{no warnings; Getopt::Long::Configure("pass_through"); GetOptions(%OPTIONS) };
 	@ARGV = @_ARGV;
@@ -133,8 +132,7 @@ if(defined $ENV{'COMP_CWORD'} ){
 		# pod2use works well on machines that have perl-doc installed. If it's not installed,
 		# it shows the whole program, not just the manual. If not installed (debian 10 does not,
 		# RHEL 8.x does), the perldoc is a small stub. We detect it, and roll our own documentation.
-		# Or else, it needs to be installed, for example:
-		# apt-get install perl-doc
+		# Or else, it needs to be installed, for example: apt-get install perl-doc
 		my $exe = "/usr/bin/perldoc";
 		if( -f $exe && -s $exe >125 && !$BASECFG{'FORCE'}){
 			pod2usage( -verbose => 2 )
@@ -550,18 +548,18 @@ pod2usage( -verbose => 0, -message => "$0: SUIT directory required $CFG{'SUITSDI
 
 # if the -o option is used, create a servers/tmp.lst file and put all servers in that file; then act as normal.
 if ( defined $BASECFG{'ON'} ) {
-    my $tempserverfile = $CFG{'TMPFILE'}? $CFG{'TMPFILE'} : 'tmp.lst';
-    my $tempserverfilefq = $CFG{'SUITSDIR'} .'/'. ($SUIT||$CFG{'SUIT'}) .'/'. $CFG{'SERVERS'} .'/'. $tempserverfile;
-    say "Saving ON list to $tempserverfilefq" if $CFG{'DEBUG'};
-    open(my $sfh, '>', $tempserverfilefq) or die "FATAL: $tempserverfilefq $!";
-    for my $on (@{$BASECFG{'ON'}}){
-        for my $svr (split /,/, $on){
-            chomp $svr;
-            say $sfh $svr;
-        }
-    }
-    close $sfh;
-    push @{$BASECFG{'LOOP'}}, $tempserverfile;
+	my $tempserverfile = $CFG{'TMPFILE'}? $CFG{'TMPFILE'} : 'tmp.lst';
+	my $tempserverfilefq = $CFG{'SUITSDIR'} .'/'. ($SUIT||$CFG{'SUIT'}) .'/'. $CFG{'SERVERS'} .'/'. $tempserverfile;
+	say "Saving ON list to $tempserverfilefq" if $CFG{'DEBUG'};
+	open(my $sfh, '>', $tempserverfilefq) or die "FATAL: $tempserverfilefq $!";
+	for my $on (@{$BASECFG{'ON'}}){
+		for my $svr (split /,/, $on){
+			chomp $svr;
+			say $sfh $svr;
+		}
+	}
+	close $sfh;
+	push @{$BASECFG{'LOOP'}}, $tempserverfile;
 }
 
 
@@ -866,33 +864,31 @@ while($arg_n <= $#ARGV) {
 			if ( defined $SCRIPT_FILES{$suitscript}{'!'} ) {
 				say "###$script:opening $CFG{RUNSERVERFQ} for $CFG{RUNSCRIPTFQ}" if $CFG{'DEBUG'};
 				my @read_servers = readfiletoarray( $CFG{'RUNSERVERFQ'}, $RICH{ $CFG{'RUNSERVERFQ'} }?1:0 );
+				my $counter = $#read_servers + 1;
 				my @servers;
-				my $counter = 0;
-				my %SEEN;
-				my $max = $#read_servers + 1;
-				while ( ($_ = shift @read_servers) && !$SEEN{$_}++) {
-					chomp;
-					my $found = 0;
-					++$counter;
-					for my $regexp ( @{ $SCRIPT_FILES{$suitscript}{'!'} } ) {
-						print "looking if $_ matches $regexp " if $CFG{'DEBUG'};
-						if (
-							$regexp =~ /^#(\-?\d+)(\-)?(\-?\d+)?/
-							? checkrange($1,$2,$3,$counter, $max)
-							: m/$regexp/ix
-						) {
-							s/\s+.*//;
-							push @servers, $_;
-							say "yes" if $CFG{'DEBUG'};
-							last;
+				my %SVRS;
+				for my $regexp ( @{$SCRIPT_FILES{$suitscript}{'!'}} ) {
+					my $matched=0;
+					@servers=();
+					push @servers, $_ for grep m/$regexp/ix, @read_servers;
+					my $max = $#servers + 1;
+					print "looking if $max/$counter servers match $regexp " if $CFG{'DEBUG'};
+					my @match = ($regexp =~ /#(\-?\d+)(\-)?(\-?\d+)?$/);
+					if (@match) {
+						while (my ($i, $svr) = each(@servers)){
+							++$SVRS{$svr} if checkrange(@match,$i+1,$max) && ++$matched;
 						}
-						say "no" if $CFG{'DEBUG'};
+					} else {
+						++$SVRS{$_} for @servers;
+						$matched = $#servers + 1;
 					}
+					say " $matched matched." if $CFG{'DEBUG'};
 				}
 
-				# Force server list unique
-				@read_servers = do { my %seen; grep { !$seen{$_}++ } @servers };
-				@servers = @read_servers;
+				@servers = do{ my %seen; grep !$seen{$_}++, map{s/\s.*//;$_} (sort keys %SVRS) };
+
+				say "From $counter servers, a total of ".($#servers+1)." matched: @servers" if $CFG{'DEBUG'};
+
 				if ($CFG{'XFILTER'}){
 					abort("Undefined RUN_FILTER in the configuration file") unless defined $CFG{'RUN_FILTER'};
 					@read_servers = @servers;
@@ -1265,12 +1261,12 @@ sub UnDeepCopy
 # Get a directory listing as an array
 sub getdir
 {
-    if (! -d $_[0] && $CFG{'WARNINGS'}){
-    warn "\n\nYou need to create a directory structure first. Run the following to do that:\n";
-    $SUIT = $SUIT || '..';
-    warn "$me -Cs $SUIT\n\n";
-    exit 1;
-    }
+	if (! -d $_[0] && $CFG{'WARNINGS'}){
+		warn "\n\nYou need to create a directory structure first. Run the following to do that:\n";
+		$SUIT = $SUIT || '..';
+		warn "$me -Cs $SUIT\n\n";
+		exit 1;
+	}
 	opendir( my $dh, $_[0] ) || die "Can't opendir $_[0] $!";
 	my @list = grep {! /^\./} readdir($dh);
 	closedir $dh;
@@ -1340,11 +1336,10 @@ sub export{
 	}
 }
 
-# Helper function when a range is given, for example: TEST=SERVERLIST@#1-4 (first 4 entries in SERVERLIST)
-# Negative numbers start at the end
+# Helper function when a range is given
 sub checkrange
 {
-	my(($start,$range,$end,$counter,$max)) = @_;
+	my($start,$range,$end,$counter,$max) = @_;
 	if(defined $range){
 		if (defined $end){
 			abort("Invalid range given:#\@ $start - $end . $end should be a negative index too") if($start<0 && $end>0);
@@ -1356,7 +1351,7 @@ sub checkrange
 			return $start > 0 ? $counter >= $start : $max +1 -$start >= $counter;
 		}
 	}else{
-		return $start > 0 ? $counter == $start : $max +1 -$start == $counter;
+		return $start > 0 ? $counter == $start : $max +1 +$start == $counter;
 	}
 }
 
@@ -1413,14 +1408,16 @@ For the full help, see README.md or directly on L<github|https://github.com/FBni
 
  # Run, from the suit JAVATRANSACTIONS the test JAVASERVER-SERVICES= for servers JAVA-ET
  # that match the perl regexp javaserver00[1..5] or the substring javaserver0100
- ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
+$ ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@javaserver00[1..5],javaserver0100
 
- # Run from the 5th on the JAVA-ET@ list to the second last. (use 5--1 or 5- for 5th to last)
- ./evidencer JAVATRANSACTIONS:JAVASERVER-SERVICES=JAVA-ET@#5--2
+ # Run from JAVA-ET matching 'backend', and from that sublist from the 5th to second last
+ # (use 5- for 5th to last)
+$ ./evidencer show.java.service=JAVA-ET@backend#5--2
+
+ For example: TEST=SERVERLIST@#1-4 (first 4). SERVERLIST@#-1 (last entry)( @#1 first)
 
  # show (dryrun) what would run from the suit JAVATRANSACTIONS the test
- # JAVASERVER-SERVICES= for any matching servers AND the test JAVASERVER-PORTS for any of it's
- # matching servers
+ # JAVASERVER-SERVICES= for any matching servers AND the test JAVASERVER-PORTS for any of it's matching servers
  ./evidencer -s JAVATRANSACTIONS JAVASERVER-SERVICES=* JAVASERVER-PORTS -d
 
  JAVASERVER-SERVICES=* can be written as:
@@ -1792,7 +1789,7 @@ And that would be a weird destination directory, but if you redefine it like thi
 $ ./evidencer os.show.*=localhost  -Q RUNNAMES -f -r RUNNAMES:=all_OS
 RUNNAMES=all_OS
 
-Then because of the RUN= ... --bg-log-dir "/home/nilton/CODE/PERL/evidencer/results/${RUNNAMES}" ...
+Then because of the RUN= ... --bg-log-dir "/home/user/evidencer/results/${RUNNAMES}" ...
 The results directory name is more comprehensible.
 
 Another trick is if you already fetched the information, and your RUN_POST shows you that information, then you can skip the RUN_PRE and RUN to only display the results you already have:
@@ -1908,7 +1905,7 @@ You can define arguments for your inline scripts.
 
 ./evidencer os.show.boottime=# -a CET
 
-Multiple arguments require multiple `-a` or you can use -- for ease:
+Multiple arguments require multiple `-a` or you can use --
 
 ./evidencer os.show.boottime=# -a arg1 -a arg2
 
