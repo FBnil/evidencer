@@ -275,11 +275,33 @@ subtest 'Named hosts' => sub {
 
 	@_ = execute("$exe $cfg TEST2=VM-PR-DMZ\@BACK -Dvd |grep -i look ");
 	say @_;
-	is($#_,3-1,'three lines - named ');
-	like($_[0], qr/no$/, 'Primary does not match');
-	like($_[1], qr/yes$/, 'Backup matches 1');
-	like($_[2], qr/yes$/, 'Backup matches 2');
+	is($#_,1-1,'one line - named hosts');
+	like($_[0], qr{2/3}, 'Primary does not match');
+	like($_[0], qr/2 matched/, 'Backup matches 2 servers');
+	like($_[0], qr/match BACK/, 'We are matching BACK');
 };
+
+subtest 'Named hosts with range' => sub {
+  plan tests => 8;
+
+	@_ = execute("$exe $cfg TEST2=VM-PR-DMZ\@BACK#2 -Dvd |grep -i -e look -e From ");
+	say @_;
+	is($#_,2-1,'two lines - named hosts range');
+	like($_[0], qr{2/3}, 'Two matches');
+	like($_[1], qr/1 matched/, 'Backup matches 1 servers');
+	like($_[0], qr/match BACK/, 'We are matching BACK');
+
+	@_ = execute("$exe $cfg TEST2=VM-PR-DMZ\@BACK#-1 -Dvd |grep -i -e look -e From ");
+	say @_;
+	like($_[0], qr{2/3}, 'Two matches');
+	like($_[1], qr/1 matched/, 'Backup matches 1 servers');
+	
+	@_ = execute("$exe $cfg TEST2=VM-PR-DMZ\@#1--1 -Dvd |grep -i -e look -e From ");
+	say @_;
+	like($_[0], qr{3/3}, 'Three matches');
+	like($_[1], qr/3 matched/, 'Backup matches 3 servers');
+};
+
 
 subtest 'MAXMATCHES' => sub {
   plan tests => 8;
@@ -355,6 +377,8 @@ subtest 'globlize' => sub {
   plan tests => 21;
   ok( open(my $EFH, '<', $exe) , 'read $exe globlize' );
   my @code;
+  # https://www.aplawrence.com/Words2005/2005_06_12.html
+  # https://perlhacks.com/2014/01/dots-perl/
   while(<$EFH>) {
     push( @code, $_ ) if /sub globlize/ .. /\}/;
   }
@@ -371,3 +395,6 @@ subtest 'globlize' => sub {
 };
 
 done_testing();
+
+
+
