@@ -1,6 +1,5 @@
 #!/usr/bin/perl
-use v5.12; # each(@)
-use Getopt::Long qw(:config no_ignore_case no_getopt_compat); # https://perldoc.perl.org/Getopt::Long.txt
+use Getopt::Long qw(:config no_ignore_case no_getopt_compat);
 Getopt::Long::Configure("bundling");
 BEGIN {no warnings; $Pod::Usage::Formatter = 'Pod::Text::Termcap'}
 use Pod::Usage qw( pod2usage );
@@ -8,7 +7,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r206';
+my $VERSION = '1.0r208';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -100,26 +99,26 @@ our %OPTIONS = (
 # When using redefine: -r VAR:=VALUE it automatically adds it here
 our %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
 
-# Try to read ./.evidencer if it exists and execute it. (use it to add parameter functions)
-my $dotme = $me;
-$dotme =~s{^.*/\K}{.};
+# If ./.evidencer exists then execute it. (for userdefined parameter functions)
+(my $dotme = $me) =~s{^.*/\K}{.};
 do $dotme if -f $dotme;
 
+# ~scriptlink
+push @ARGV, @ARGV? $1 : ($1,'-hv') if $me=~s{^.*/\K~(.+)}{evidencer};
+
 # if COMP_CWORD is defined, then tab-expansion is active. We process the options without removing them from @ARGV
-if(defined $ENV{'COMP_CWORD'} ){
+if (defined $ENV{'COMP_CWORD'}) {
 	# Now we do need a change in behavior if a suit is loaded, so we need to process
 	# the incomplete commandline, but preserve it at the same time.
 	my @_ARGV = @ARGV;
 	{no warnings; Getopt::Long::Configure("pass_through"); GetOptions(%OPTIONS) };
 	@ARGV = @_ARGV;
-}else{
+} else {
 	my $num_args = $#ARGV;
 	# Before GetOptions, check if we have a -- and grab the arguments into %{ARG}
 	if ( grep /^(?:\-\-|—)$/, @ARGV ) {
 		@_ = ();
-		while ( ( $_ = pop @ARGV ) !~ /^(?:\-\-|—)$/ ) {
-			unshift @_, $_;
-		}
+		unshift @_, $_ while ( $_ = pop @ARGV ) !~ /^(?:\-\-|—)$/;
 		@{$BASECFG{ARG}} = @_;
 	}
 
@@ -134,11 +133,10 @@ if(defined $ENV{'COMP_CWORD'} ){
 		# RHEL 8.x does), the perldoc is a small stub. We detect it, and roll our own documentation.
 		# Or else, it needs to be installed, for example: apt-get install perl-doc
 		my $exe = "/usr/bin/perldoc";
-		if( -f $exe && -s $exe >125 && !$BASECFG{'FORCE'}){
-			pod2usage( -verbose => 2 )
-		}else{
-			pod3usage( -verbose => 2 );
-		}
+		&{
+			(-f $exe && -s $exe >125 && !$BASECFG{'FORCE'}) ?
+			\&pod2usage : \&pod3usage
+		}( -verbose => 2 );
 	}
 
 	# Make sure at least one argument provided
@@ -147,11 +145,9 @@ if(defined $ENV{'COMP_CWORD'} ){
 	}
 }
 
-# Convert Arguments array to space separated string
-if ( $BASECFG{'ARG'} ) {
-	if ( ref $BASECFG{'ARG'} eq "ARRAY" ) {
-		$BASECFG{'ARG'} = join '  ', @{$BASECFG{'ARG'}};
-	}
+# Convert Arguments array to quoted and space separated string
+if ( $BASECFG{'ARG'}  && ( ref $BASECFG{'ARG'} eq "ARRAY" ) ) {
+	$BASECFG{'ARG'} = join '  ', map{"'\Q$_\E'"} @{$BASECFG{'ARG'}};
 }
 
 # Read configuration file(s)
@@ -520,12 +516,10 @@ if ( $CFG{'CREATEDIRS'} ) {
 	my $sfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0);
 	if(defined $CFG{'SUIT_LINK'} && $CFG{'SUIT_LINK'}  && $SUIT ne '..' && ! -f $sfile){
 		#my $r=symlink $me, $sfile; # symlink with absolute path
-		my $r=symlink '../../'.basename($0), $sfile; # relative path (looks better when ls -l)
-		if($r==1){
-			say "symlinked $sfile"
-		}else{
-			say "ERROR: Could not create symlink\n $sfile\nfor\n $me\n $!"
-		}
+		# relative path (looks better when ls -l)
+		say ( (symlink '../../'.basename($0), $sfile) ?
+			"symlinked $sfile"
+			:"ERROR: Could not create symlink\n $sfile\nfor\n $me\n $!");
 	}
 	my $cfile = $CFG{'SUITSDIR'} . '/' . $SUIT . '/' . basename($0).'.cfg';
 	if(defined $CFG{'SUIT_CFG'} && $CFG{'SUIT_CFG'} && $CFG{'CFGFILE'} && -r $CFG{'CFGFILE'} && $SUIT ne '..' && ! -f $cfile){
@@ -875,8 +869,8 @@ while($arg_n <= $#ARGV) {
 					print "looking if $max/$counter servers match $regexp " if $CFG{'DEBUG'};
 					my @match = ($regexp =~ /#(\-?\d+)(\-)?(\-?\d+)?$/);
 					if (@match) {
-						while (my ($i, $svr) = each(@servers)){
-							++$SVRS{$svr} if checkrange(@match,$i+1,$max) && ++$matched;
+						for (my $i=@servers; $i>=0; --$i) {
+							++$SVRS{$servers[$i]} if checkrange(@match,$i+1,$max) && ++$matched;
 						}
 					} else {
 						++$SVRS{$_} for @servers;
@@ -916,10 +910,7 @@ while($arg_n <= $#ARGV) {
 				     # only create a temporal file if we do not match ALL servers in this group.
 				if ( $#servers + 1 < $counter || $RICH{ $CFG{'RUNSERVERFQ'} } ) {
 					my $tempfile =
-					    ( $suit eq ".." ? '_' : $suit ) . '#'
-					  . $script . '#'
-					  . $server . '#'
-					  . $CFG{PID};
+					    ( $suit eq ".." ? '_' : $suit ) . '#' . $script . '#' . $server . '#' . $CFG{PID};
 					push @{ $CFG{'_CLEANUP'} }, ( $CFG{'RUNSERVERFQ'} = $CFG{'TEMP'} . '/' . $tempfile );
 					$CFG{'RUNSERVERSDIR'} = $CFG{'TEMP'};
 					$CFG{'RUNSERVER'} = $server = $tempfile;
@@ -941,10 +932,8 @@ while($arg_n <= $#ARGV) {
 
 			if ( $CFG{'FOLD'} || $CFG{'GROUP'} || $CFG{'BUNDLE'} ) {
 				say "Defering execution("
-				.($CFG{'FOLD'}?'F':'f')
-				.($CFG{'GROUP'}?'G':'g')
-				.($CFG{'BUNDLE'}?'B':'b')
-				."): $CFG{'RUNSCRIPT'} on $CFG{'RUNSERVER'}" if $CFG{'DEBUG'};
+				. join "", map { /^(.)/; $CFG{$_}? $1 : lc $1 } qw(FOLD GROUP BUNDLE)
+				. "): $CFG{'RUNSCRIPT'} on $CFG{'RUNSERVER'}" if $CFG{'DEBUG'};
 				$DEFER{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }++;
 				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{ $CFG{'RUNSERVERFQ'} }} = UnDeepCopy(\%CFG) unless $CFG{'GROUP'};
 				%{$CFGSTOR{ $CFG{'RUNSCRIPTFQ'} }{'_'}} = UnDeepCopy(\%CFG);
@@ -1484,7 +1473,9 @@ To create a suits directory structure:
 
 If you have B<SUIT_LINK=1> and/or B<SUIT_CFG=1> in your configuration file, then evidencer will be symlinked into that directory and/or the evidencer.cfg file will be copied into the new suit.
 
+scriptlink direct access 
 
+ln -s ./evidencer ./~script
 
 =head1 CONFIGURATION
 
@@ -1683,7 +1674,7 @@ The inner loop uses this glob:  echo RUN{_PRE,,_POST}{_TEST,}
 
 =head1 OPTIONS
 
- [OPT         DESCRIPTION]
+ [OPT]              [DESCRIPTION]
 
  -h | --help | -?   Print Options and Usage.
  --man              Print complete man page.

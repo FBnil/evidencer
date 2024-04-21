@@ -181,10 +181,10 @@ subtest 'argument1' => sub {
   plan tests => 2;
   @_ = execute("$exe $cfg TEST2=++ET\@svr1et -d -v -- --fantastic 4 |grep ^echo");
   say @_;
-  like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument --fantastic  4!, 'argument1a');
-  @_ = execute("$exe $cfg TEST2=++ET\@svr1et -d -v -a incredible |grep ^echo");
+  like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument '\\-\\-fantastic'  '4'!, 'argument1a');
+  @_ = execute("$exe $cfg TEST2=++ET\@svr1et -d -v -a 'incredible feat' |grep ^echo");
   say @_;
-  like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument incredible!, 'argument2a');
+  like($_[0], qr!on /.*/BUILDTEST#TEST2=\+\+ET#VM-ET#\d+ with argument 'incredible\\ feat'!, 'argument2a');
 };
 
 @_ = execute("$exe $cfg =# -y -dv |grep -v '# RUN:'|grep RUN");
