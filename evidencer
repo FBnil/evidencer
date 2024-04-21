@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+use v5.16;
 use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case no_getopt_compat);
@@ -9,7 +10,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r208';
+my $VERSION = '1.0r209';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -105,8 +106,8 @@ our %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
 (my $dotme = $me) =~s{^.*/\K}{.};
 do $dotme if -f $dotme;
 
-# ~scriptlink
-push @ARGV, @ARGV? $1 : ($1,'-hv') if $me=~s{^.*/\K~(.+)}{evidencer};
+# scriptlink~
+splice @ARGV, (grep { $ARGV[$_] eq '--' } (0 .. @ARGV-1))[0]||@ARGV, 0, @ARGV? $1 : ("$1=",'-hv') if $me=~s{^.*/\K(.+)~}{evidencer};
 
 # if COMP_CWORD is defined, then tab-expansion is active. We process the options without removing them from @ARGV
 if (defined $ENV{'COMP_CWORD'}) {
@@ -121,7 +122,7 @@ if (defined $ENV{'COMP_CWORD'}) {
 	if ( grep /^(?:\-\-|—)$/, @ARGV ) {
 		@_ = ();
 		unshift @_, $_ while ( $_ = pop @ARGV ) !~ /^(?:\-\-|—)$/;
-		@{$BASECFG{ARG}} = @_;
+		@{$CFG{ARG}} = @_;
 	}
 
 	GetOptions(%OPTIONS) or pod2usage(1);
@@ -146,10 +147,10 @@ if (defined $ENV{'COMP_CWORD'}) {
 		pod2usage( -verbose => 0, -message => "$0: one argument required" );
 	}
 }
-
-# Convert Arguments array to quoted and space separated string
-if ( $BASECFG{'ARG'}  && ( ref $BASECFG{'ARG'} eq "ARRAY" ) ) {
-	$BASECFG{'ARG'} = join '  ', map{"'\Q$_\E'"} @{$BASECFG{'ARG'}};
+# Convert -a & -- Arguments array to quoted and space separated string
+if ( $BASECFG{'ARG'} || $CFG{'ARG'} ) {
+	 $BASECFG{'ARG'} = join '  ', map{"'\Q$_\E'"} @{$BASECFG{'ARG'}},@{$CFG{'ARG'}};
+	 undef $CFG{'ARG'};
 }
 
 # Read configuration file(s)
@@ -263,12 +264,12 @@ say "BASEDIR=$CFG{'BASEDIR'} CFGFILE=$CFG{'CFGFILE'}" if $CFG{'DEBUG'};
 # use a dot to show all help from all scripts that have it
 if($opt_help && @ARGV && !$opt_complete) {
 	my $SUITDIR = $CFG{'SUITSDIR'}.'/'.$CFG{'SUIT'}.'/';
-	# Read all fils in ./scripts/ that are methods (i.e. have the form: script=serverfilter)
+	# Read all files in ./scripts/ that are methods (i.e. have the form: script=serverfilter)
 	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
 
 	my %K;
 	my $search = pop @ARGV; # only consider the last argument parameter given
-	$search =~ s/=.*//; # remove the server part, if there
+	$search =~ s/=\K.*//; # remove the server part, if there
 
 	# Deep search for a word inside any comments in the scripts, and display that method
 	my $better = $search=~s/\+//;
@@ -317,7 +318,7 @@ if ($opt_complete)
 	# print completion code
 	unless($ENV{'COMP_CWORD'}){
 		say join "\n", grep { s/## // && (!/-F/ || (@ARGV?s/\w+$/$ARGV[0]/:s/\w+$/basename($0)/e)) && !/# / } readfiletoarray($0, -1, '^##');
-		exit
+		exit;
 	};
 	my $SUITDIR = $CFG{'SUITSDIR'}.'/'.$CFG{'SUIT'}.'/';
 
@@ -405,14 +406,14 @@ if ($opt_complete)
 			@candidates = map { $_ = '-' x $dashes . $_ } @candidates;
 		}
 		say join " ", sort @candidates;
-		exit 0;
+		exit;
 	}
 
 
 	# Process ALIAS that start with /
 	if ( $search =~ m/^\// && $m >0) {
 		say join " ", grep { /^$search/ }  (sort keys %{$CFG{'ALIAS'}});
-		exit 0;
+		exit;
 	}
 
 	my @methods = grep { /=/ && -x "${SUITDIR}$CFG{'SCRIPTS'}/$_" } getdir(${SUITDIR}.$CFG{'SCRIPTS'});
@@ -429,7 +430,7 @@ if ($opt_complete)
 		@candidates = keys %K;
 		unless ($#candidates == 0 && $candidates[0] =~ /[\.=]$/){
 			say join " ", @candidates;
-			exit ;
+			exit;
 		}
 	} elsif ( $search !~ /=/ && $ARGV[ $ENV{'COMP_CWORD'} ] ne '=' ) {
 		my @M = @methods;
@@ -1177,7 +1178,7 @@ sub xexpandAll
 		xexpand( $v, '%\{([\w:]+)\}', \%CFG );
 	}
 	if(index( $v, "\${" ) > -1 && !$isdryrun){
-		xexpand( $v, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' ) ;
+		xexpand( $v, '\$\{(\w+)\}', \%{ $CFG{'ALIAS'} }, '$' );
 		xexpand( $v, '\$\{(\w+)\}', \%CFG, '$' )
 	}
 	$v;
@@ -1188,7 +1189,7 @@ sub updateTime
 {
 	my ( $v, $e ) = @_;
 	$v->{"EPOCH"} = $e = ( $e || time );
-	my @T = $CFG{'UTC'} ? gmtime($e) : localtime($e);    # S M H d m+1 y+1900 wd yd daylightsaving
+	my @T = $CFG{'UTC'} ? gmtime($e) : localtime($e);  # S M H d m+1 y+1900 wd yd daylightsaving
 	$v->{"HH"} = $T[2] < 10 ? '0' . $T[2] : $T[2];     # hour (00..23)
 	$v->{"MM"} = $T[1] < 10 ? '0' . $T[1] : $T[1];     # minute (00..59)
 	$v->{"SS"} = $T[0] < 10 ? '0' . $T[0] : $T[0];     # seconds (00..23)
@@ -1222,7 +1223,7 @@ sub readfiletoarray
 			$_ = xexpand( $_, '%\{(\w+)\}', \%CFG ) if index( $_, "%{" ) > -1;
 			push @_SVRS, readfiletoarray( $_, 1 , $_filter||undef);
 		} else {
-			$CFG{'RICH'}++ if /\s/;    # signal we have a commented hostfile
+			$CFG{'RICH'}++ if /\s/; # signal we have a commented hostfile
 			push @_SVRS, $_;
 		}
 	}
@@ -1350,39 +1351,38 @@ sub checkrange
 # Attempt at making our own pod. This is required when the perl-doc package is not installed.
 sub pod3usage{
 	no warnings;
-		my $exe;
-		$exe="$_" if(($_="/usr/bin/more") && -x $_);
-		$exe="$_ -R" if(($_="/usr/bin/less") && -x $_);
-		#$exe="$_ -l -" if(($_="/usr/bin/man") && -x $_);
+	my $exe;
+	$exe="$_" if(($_="/usr/bin/more") && -x $_);
+	$exe="$_ -R" if(($_="/usr/bin/less") && -x $_);
 
-		if($BASECFG{'REDEFINE'}[0]=~/NOCOLORS/){
-			$BASECFG{$_}="" for grep {/C:/} keys %BASECFG;
+	if($BASECFG{'REDEFINE'}[0]=~/NOCOLORS/){
+		$BASECFG{$_}="" for grep {/C:/} keys %BASECFG;
+	}
+	open(my $HOUT,"|$exe");
+	my $skip=1;
+	while(<DATA>){
+		chomp;
+		next if $skip && !$_ && $skip--;
+		if( s/=head\d (.*)/$BASECFG{'C:B'}$BASECFG{'C:U'}$1$BASECFG{'C:N'}/){
+			say $HOUT $_."\n";
+			++$skip;
+			next;
+		}else{
+			s/^=(?:item|over \d+|cut|back)// && ++$skip;
+			s/L<(?:.*\|)?([^>]*)>|(Note:|TIP:)/$BASECFG{'C:Y'}$1$2$BASECFG{'C:N'}/g;
+			s/^((?:\$ .*|\.\/.*|eval .*))/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/;
+			s/`(.*?)`/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/g;
+			s/^(#.*)/$BASECFG{'C:A'}$1$BASECFG{'C:N'}/;
+			s/B<([^>]*)>/$BASECFG{'C:B'}$1$BASECFG{'C:N'}/g;
+			if(/^\S/){
+				s/^/    /;
+				s/(?:.{70,79}\S|\S{70,}+)\K\s+/\n    /g;
+			};
+			say $HOUT $_;
 		}
-		open(my $HOUT,"|$exe");
-		my $skip=1;
-		while(<DATA>){
-			chomp;
-			next if $skip && !$_ && $skip--;
-			if( s/=head\d (.*)/$BASECFG{'C:B'}$BASECFG{'C:U'}$1$BASECFG{'C:N'}/){
-				say $HOUT $_."\n";
-				++$skip;
-				next;
-			}else{
-				s/^=(?:item|over \d+|cut|back)// && ++$skip;
-				s/L<(?:.*\|)?([^>]*)>|(Note:|TIP:)/$BASECFG{'C:Y'}$1$2$BASECFG{'C:N'}/g;
-				s/^((?:\$ .*|\.\/.*|eval .*))/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/;
-				s/`(.*?)`/$BASECFG{'C:L'}$1$BASECFG{'C:N'}/g;
-				s/^(#.*)/$BASECFG{'C:A'}$1$BASECFG{'C:N'}/;
-				s/B<([^>]*)>/$BASECFG{'C:B'}$1$BASECFG{'C:N'}/g;
-				if(/^\S/){
-					s/^/    /;
-					s/(?:.{70,79}\S|\S{70,}+)\K\s+/\n    /g;
-				};
-				say $HOUT $_;
-			}
-		}
-		close $HOUT;
-		exit;
+	}
+	close $HOUT;
+	exit;
 }
 __END__
 
@@ -1478,7 +1478,7 @@ If you have B<SUIT_LINK=1> and/or B<SUIT_CFG=1> in your configuration file, then
 
 scriptlink for direct access
 
-$ ln -s ./evidencer ./~script
+$ ln -s ./evidencer ./script~
 
 =head1 CONFIGURATION
 
