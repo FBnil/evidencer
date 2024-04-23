@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-use v5.16;
 use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case no_getopt_compat);
@@ -10,7 +9,7 @@ use File::Basename qw(dirname basename fileparse fileparse_set_fstype);
 use Cwd qw(abs_path getcwd);
 use feature 'say';
 
-my $VERSION = '1.0r209';
+my $VERSION = '1.0r210';
 my $CFGFILE;
 my %DEFER;    # for GROUP or (UN)FOLD
 my @DEFERARR; # Keep the execution order as much as possible
@@ -103,11 +102,11 @@ our %OPTIONS = (
 our %DONOTOVERRIDE = map { $_ => 1 } qw(DEBUG VERBOSE DRYRUN CREATEDIRS FORCE);
 
 # If ./.evidencer exists then execute it. (for userdefined parameter functions)
-(my $dotme = $me) =~s{^.*/\K}{.};
+(my $dotme = $me) =~ s{^.*/\K}{.};
 do $dotme if -f $dotme;
 
 # scriptlink~
-splice @ARGV, (grep { $ARGV[$_] eq '--' } (0 .. @ARGV-1))[0]||@ARGV, 0, @ARGV? $1 : ("$1=",'-hv') if $me=~s{^.*/\K(.+)~}{evidencer};
+splice @ARGV, (grep { $ARGV[$_] eq '--' } (0 .. @ARGV-1))[0] || @ARGV, 0, @ARGV? $1 : ("$1=",'-hv') if $me=~s{^.*/\K(.+)~}{evidencer};
 
 # if COMP_CWORD is defined, then tab-expansion is active. We process the options without removing them from @ARGV
 if (defined $ENV{'COMP_CWORD'}) {
@@ -873,7 +872,7 @@ while($arg_n <= $#ARGV) {
 					print "looking if $max/$counter servers match $regexp " if $CFG{'DEBUG'};
 					my @match = ($regexp =~ /#(\-?\d+)(\-)?(\-?\d+)?$/);
 					if (@match) {
-						for (my $i=@servers; $i>=0; --$i) {
+						for (my $i=$#servers; $i>=0; --$i) {
 							++$SVRS{$servers[$i]} if checkrange(@match,$i+1,$max) && ++$matched;
 						}
 					} else {
@@ -1318,7 +1317,7 @@ sub export{
 			$var = shift @_;
 			push @{ $CFG{'EXPORT'} }, @_;
 		}
-		if($var=~m{^/(.+)/$}){
+		if ($var=~m{^/(.+)/$}) {
 			my $_var = $1;
 			for my $k (grep {/$_var/ } keys %CFG){
 				$ENV{$k} = $CFG{$k} || '';
@@ -1338,7 +1337,7 @@ sub checkrange
 			abort("Invalid range given:#\@ $start - $end . $end should be a negative index too") if($start<0 && $end>0);
 			$start = $max+1 + $start if $start < 0;
 			$end = $max+1 + $end if $end < 0;
-			abort("Invalid range given:#\@ $start - $end . $end should bigger than $start") if($start>$end);
+			abort("Invalid range given:#\@ $start - $end . $end should be bigger than $start") if($start>$end);
 			return $start <= $counter && $counter <= $end;
 		}else{
 			return $start > 0 ? $counter >= $start : $max +1 -$start >= $counter;
@@ -1363,7 +1362,7 @@ sub pod3usage{
 	while(<DATA>){
 		chomp;
 		next if $skip && !$_ && $skip--;
-		if( s/=head\d (.*)/$BASECFG{'C:B'}$BASECFG{'C:U'}$1$BASECFG{'C:N'}/){
+		if( s/=head\d (.*)/$BASECFG{'C:B'}$BASECFG{'C:U'}$1$BASECFG{'C:N'}/ ){
 			say $HOUT $_."\n";
 			++$skip;
 			next;
@@ -1476,7 +1475,7 @@ To create a suits directory structure:
 
 If you have B<SUIT_LINK=1> and/or B<SUIT_CFG=1> in your configuration file, then evidencer will be symlinked into that directory and/or the evidencer.cfg file will be copied into the new suit.
 
-scriptlink for direct access
+scriptlink for direct access.
 
 $ ln -s ./evidencer ./script~
 
