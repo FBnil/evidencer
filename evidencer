@@ -1145,7 +1145,7 @@ sub runit
 
 # transform lazy search into a glob-able pattern
 sub globlize
-{
+{no warnings;
 	$_[0] =~ s/^(\+\+)|(=\K\+\+)|(\+\+)$/$1||$2?"*-":"-*"/ge; # border ++ to *
 	$_[0] =~ s/^(\-)|(\-)$/$2*$1/g; # border - to *- or -*
 	$_[0] =~ s/\+\+|\-\-/-*-/g;     # middel ++ to -*-
@@ -1192,7 +1192,7 @@ sub updateTime
 	$v->{"HH"} = $T[2] < 10 ? '0' . $T[2] : $T[2];     # hour (00..23)
 	$v->{"MM"} = $T[1] < 10 ? '0' . $T[1] : $T[1];     # minute (00..59)
 	$v->{"SS"} = $T[0] < 10 ? '0' . $T[0] : $T[0];     # seconds (00..23)
-	$v->{"WD"} = $T[6] || 7;                           # 1=Monday ... 6=Saturday, 7=Sunday
+	$v->{"WD"} = $T[6] || 7;                           # 1=Monday ... 7=Sunday
 	$v->{"WN"} = sprintf("%02d", int($T[7]/7)+1);      # Week number 01..52/53
 	$v->{"YD"} = sprintf( "%03d", $T[7] + 1 )
 	  ;    # day of the year, in the range 001..365 (or 001..366 if leap year)
